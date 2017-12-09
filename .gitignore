@@ -1,0 +1,9 @@
+DerivedDataCache/
+DerivedData/
+Intermediate/
+Saved/
+Binaries/
+Packages/
+*.xcworkspace
+*.vs
+*.sln
