@@ -4,9 +4,6 @@
 #include "GameFramework/GameModeBase.h"
 #include "OutcastGameModeBase.generated.h"
 
-/**
- * 
- */
 UCLASS()
 class OUTCAST_API AOutcastGameModeBase : public AGameModeBase
 {
