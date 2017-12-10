@@ -11,10 +11,10 @@ AOutcastCharacter::AOutcastCharacter()
     SkeletalMeshComp->SetSkeletalMesh(Mesh.Object);
   }
 
-  static ConstructorHelpers::FObjectFinder<UAnimBlueprint> Anim(TEXT("AnimBlueprint'/Game/Feline_Warrior/Animations/Character_Animation_BP.Character_Animation_BP'"));
-  if (Anim.Succeeded())
+  static ConstructorHelpers::FObjectFinder<UClass> AnimBP(TEXT("Class'/Game/Feline_Warrior/Animations/Character_Animation_BP.Character_Animation_BP_C'"));
+  if (AnimBP.Succeeded())
   {
-    SkeletalMeshComp->SetAnimInstanceClass(Anim.Object->GetAnimBlueprintGeneratedClass());
+    SkeletalMeshComp->SetAnimInstanceClass(AnimBP.Object);
   }
 
   Capsule = Cast<UCapsuleComponent>(RootComponent);
@@ -24,6 +24,7 @@ AOutcastCharacter::AOutcastCharacter()
     Capsule->SetCapsuleRadius(60.0f);
 
     Capsule->SetRelativeLocation(FVector(0.0f, 0.0f, 122.0f));
+    Capsule->OnComponentHit.__Internal_AddDynamic(this, &AOutcastCharacter::OnHit, FName("OnHit"));
 
   }
 
@@ -38,6 +39,8 @@ AOutcastCharacter::AOutcastCharacter()
 
   Camera->SetRelativeLocation(FVector(-310.0f, 0.0f, 123.0f));
   Camera->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
+
+  Movement = Cast<UCharacterMovementComponent>(GetMovementComponent());
 
   // Take control of the player
   AutoPossessPlayer = EAutoReceiveInput::Player0;
@@ -54,10 +57,14 @@ void AOutcastCharacter::BeginPlay()
     Destroy();
   }
 
-  Speed           = 0.0f;
-  JumpHeight      = 0.0f;
-  JumpHeightLimit = 500.0f;
-  Direction       = FVector();
+  Speed              = 0.0f;
+  JumpHeight         = 0.0f;
+  JumpHeightLimit    = 1000.0f;
+  BunnyHopSpeedRatio = 100.0f;
+  MinJumpHeight      = 75.0f;
+  Direction          = FVector();
+
+  Movement->AirControl = 1.0f;
 }
 
 void AOutcastCharacter::Tick(float DeltaTime)
@@ -129,8 +136,18 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   if (!Direction.IsZero())
   {
-    FVector Location = GetActorLocation();
-    SetActorLocation(Location + Direction * Speed / 5);
+    if (Jumping == EJump::NONE)
+    {
+      AddMovementInput(Direction, Speed / 5);
+    }
+    else if (Jumping == EJump::BunnyHop)
+    {
+      AddMovementInput(Direction, Speed / BunnyHopSpeedRatio);
+    }
+    else
+    {
+      AddMovementInput(Direction, Speed / 100);
+    }
   }
 
   //******** MOVE AROUND ********
@@ -139,65 +156,78 @@ void AOutcastCharacter::Tick(float DeltaTime)
   //******** JUMP ********
   if (KeyMap[EKeys::Space])
   {
-    if (JumpHeight < JumpHeightLimit && Jumping != EJump::Downwards)
+    if (Jumping != EJump::BunnyHop)
     {
-      Jumping = EJump::Upwards;
-    }
-    else
-    {
-      Jumping = EJump::Downwards;
+      if ( JumpHeight < JumpHeightLimit
+        && Jumping != EJump::Downwards)
+      {
+        if (Jumping == EJump::NONE)
+        {
+          JumpStartLocZ = GetActorLocation().Z;
+        }
+        Jumping = EJump::Upwards;
+      }
+      else
+      {
+        Jumping = EJump::Downwards;
+      }
     }
   }
-  else
+  else if ((Jumping == EJump::Upwards|| Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
   {
-    if (JumpHeight > 0.0f)
-    {
-      Jumping = EJump::Downwards;
-    }
-    else
-    {
-      Jumping = EJump::NONE;
-    }
+    Jumping = EJump::Downwards;
   }
-
+ 
   if (Jumping == EJump::Upwards)
   {
-    JumpHeight = JumpHeight + 5;
+    JumpHeight = GetActorLocation().Z - JumpStartLocZ;
+    Movement->SetMovementMode(MOVE_Flying);
 
-    FVector Loc = GetActorLocation();
-    Loc.Z       = Loc.Z + 5;
-    SetActorLocation(Loc);
+    AddMovementInput(GetActorUpVector(), 5.0f);
 
-    //Jump();
     Anim->SetIsJumping(true);
-  }
-  else if (Jumping == EJump::Downwards && JumpHeight > 0.0f)
-  {
-    JumpHeight = JumpHeight - 5;
-
-    FVector Loc = GetActorLocation();
-    Loc.Z       = Loc.Z - 5;
-    SetActorLocation(Loc);
-  }
-  else
-  {
-    Anim->SetIsJumping(false);
-  }
-
-  FString TheJump;
-  if (Jumping == EJump::Upwards)
-  {
-    TheJump = "Jumping Upwards";
   }
   else if (Jumping == EJump::Downwards)
   {
-    TheJump = "Jumping Downwards";
+    Movement->SetMovementMode(MOVE_Falling);
   }
-  else
+  else if (Jumping == EJump::NONE)
   {
-    TheJump = "Jumping NONE";
+    JumpHeight = 0.0f;
+    Anim->SetIsJumping(false);
   }
-  UE_LOG(LogTemp, Warning, TEXT("%s -- %f"), *TheJump, JumpHeight);
+  else if (Jumping == EJump::BunnyHop)
+  {
+    Anim->SetIsJumping(true);
+
+    JumpHeight = GetActorLocation().Z - JumpStartLocZ;
+
+    AddMovementInput(GetActorUpVector(), 5.0f);
+    if (JumpHeight > 100.0f)
+    {
+      Jumping            = EJump::Upwards;
+      BunnyHopSpeedRatio = 100.0f;
+    }
+  }
+  
+  FString JumpMode;
+  if (Jumping == EJump::NONE)
+  {
+    JumpMode = "NONE";
+  }
+  else if (Jumping == EJump::Upwards)
+  {
+    JumpMode = "Upwards";
+  }
+  else if (Jumping == EJump::Downwards)
+  {
+    JumpMode = "Downwards";
+  }
+  else if(Jumping == EJump::BunnyHop)
+  {
+    JumpMode = "BUNNYHOP !!!";
+  }
+  UE_LOG(LogTemp, Warning, TEXT("Mode: %s -- JumpHeight: %f"), *JumpMode, JumpHeight);
   //******** JUMP ********
 }
 
@@ -353,4 +383,31 @@ void AOutcastCharacter::MouseUpDown(const float AxisValue)
 void AOutcastCharacter::MouseRightLeft(const float AxisValue)
 {
   MouseInput.X = AxisValue;
+}
+
+void AOutcastCharacter::OnHit(
+  UPrimitiveComponent* HitComp,
+  AActor* OtherActor,
+  UPrimitiveComponent* OtherComp,
+  FVector NormalImpulse,
+  const FHitResult& Hit)
+{
+  // Character is on top of a walkable plane
+  if (OtherActor->ActorHasTag(FName("Walkable")))
+  {
+    if (KeyMap[EKeys::Space] && Jumping == EJump::Downwards || Jumping == EJump::BunnyHop)
+    {
+      Jumping            = EJump::BunnyHop;
+      JumpHeight         = 0.0f;
+      BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, 10.0f, 100.0f);
+      Anim->SetIsJumping(false);
+      Movement->SetMovementMode(MOVE_Flying);
+    }
+    else
+    {
+      Jumping            = EJump::NONE;
+      BunnyHopSpeedRatio = 100.0f;
+      Movement->SetMovementMode(MOVE_Walking);
+    }
+  }
 }

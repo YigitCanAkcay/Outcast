@@ -8,6 +8,7 @@
 #include "Runtime/Engine/Classes/Animation/AnimBlueprint.h"
 #include "Runtime/Engine/Classes/Camera/CameraComponent.h"
 #include "Runtime/Engine/Classes/Components/CapsuleComponent.h"
+#include "Runtime/Engine/Classes/GameFramework/CharacterMovementComponent.h"
 
 #include "OutcastAnimInstance.h"
 
@@ -26,6 +27,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   UPROPERTY(VisibleAnywhere, Category = Camera)
     UCameraComponent* Camera;
+
+  UCharacterMovementComponent* Movement;
   //******** COMPONENTS ********
 
   //******** ANIMATION ********
@@ -38,11 +41,15 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   {
     NONE,
     Upwards,
-    Downwards
+    Downwards,
+    BunnyHop
   };
   EJump Jumping;
   float JumpHeight;
   float JumpHeightLimit;
+  float JumpStartLocZ;
+  float MinJumpHeight;
+  float BunnyHopSpeedRatio;
 
   //******** ANIMATION ********
 
@@ -81,6 +88,14 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void MouseUpDown(const float AxisValue);
   void MouseRightLeft(const float AxisValue);
   //******** KEYBOARD INPUT ********
+
+  UFUNCTION()
+  void OnHit(
+    UPrimitiveComponent* HitComp,
+    AActor* OtherActor, 
+    UPrimitiveComponent* OtherComp, 
+    FVector NormalImpulse, 
+    const FHitResult& Hit);
 
 public:
 	AOutcastCharacter();
