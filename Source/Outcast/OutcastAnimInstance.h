@@ -9,6 +9,7 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
 {
   GENERATED_UCLASS_BODY()
 
+  //******** BASIC MOVEMENT ********
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     bool bIsJumping;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
@@ -19,6 +20,12 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
     bool bIsSlashingLeft;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     float PlayRate;
+
+  // ---- TORSO ----
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
+    FRotator TorsoRotation;
+  // ---- TORSO ----
+  //******** BASIC MOVEMENT ********
 
 public:
   void SetIsRunning(const bool bNewIsRunning);
@@ -33,4 +40,7 @@ public:
   bool GetIsSlashingLeft() const;
 
   void SetWalkPlayrate(const float NewPlayRate);
+
+  void SetTorsoRotation(const FRotator& NewTorsoRotation);
+  FRotator GetTorsoRotation() const;
 };

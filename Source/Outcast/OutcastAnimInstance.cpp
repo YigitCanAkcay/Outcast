@@ -1,13 +1,15 @@
 #include "OutcastAnimInstance.h"
 
 UOutcastAnimInstance::UOutcastAnimInstance(const FObjectInitializer& ObjectInitializer)
-  : Super(ObjectInitializer)
+  : 
+  Super(ObjectInitializer),
+  bIsJumping(false),
+  bIsRunning(false),
+  bIsSlashingLeft(false),
+  Speed(0.0f),
+  PlayRate(1.0f),
+  TorsoRotation(FRotator())
 {
-  bIsJumping      = false;
-  bIsRunning      = false;
-  bIsSlashingLeft = false;
-  Speed           = 0.0f;
-  PlayRate        = 1.0f;
 }
 
 void UOutcastAnimInstance::SetIsRunning(const bool bNewIsRunning)
@@ -45,4 +47,14 @@ bool UOutcastAnimInstance::GetIsSlashingLeft() const
 void UOutcastAnimInstance::SetWalkPlayrate(const float NewPlayRate)
 {
   PlayRate = NewPlayRate;
+}
+
+void UOutcastAnimInstance::SetTorsoRotation(const FRotator& NewTorsoRotation)
+{
+  TorsoRotation = NewTorsoRotation;
+}
+
+FRotator UOutcastAnimInstance::GetTorsoRotation() const
+{
+  return TorsoRotation;
 }

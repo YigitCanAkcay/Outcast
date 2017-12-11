@@ -45,11 +45,12 @@ AOutcastCharacter::AOutcastCharacter()
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
   Camera->SetupAttachment(RootComponent);
 
-  Camera->SetRelativeLocation(FVector(-310.0f, 0.0f, 123.0f));
+  Camera->SetRelativeLocation(FVector(-423.0f, 0.0f, 200.0f));
   Camera->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
 
-  Movement = Cast<UCharacterMovementComponent>(GetMovementComponent());
-  Movement->AirControl = 1.0f;
+  Movement               = Cast<UCharacterMovementComponent>(GetMovementComponent());
+  Movement->AirControl   = 1.0f;
+  Movement->MaxWalkSpeed = 1000.0f;
 
   // Take control of the player
   AutoPossessPlayer = EAutoReceiveInput::Player0;
@@ -72,12 +73,36 @@ void AOutcastCharacter::Tick(float DeltaTime)
   Super::Tick(DeltaTime);
 
   //******** LOOK AROUND ********
+  
+  // Rotate whole Character
   FRotator NewRotation = GetActorRotation();
   NewRotation.Yaw      = NewRotation.Yaw + MouseInput.X;
-  NewRotation.Pitch    = NewRotation.Pitch + MouseInput.Y;
-  NewRotation.Pitch    = FMath::Clamp(NewRotation.Pitch, -80.0f, 80.0f);
-
   SetActorRotation(NewRotation);
+
+  // Rotate the torso of the character
+  FRotator NewTorsoRotation = Anim->GetTorsoRotation();
+  NewTorsoRotation.Roll     = FMath::Clamp(NewTorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
+  Anim->SetTorsoRotation(NewTorsoRotation);
+
+  // Rotate the camera
+  FRotator NewCameraRot = Camera->GetComponentRotation();
+  NewCameraRot.Pitch    = NewCameraRot.Pitch + MouseInput.Y;
+
+  if (NewCameraRot.Pitch >= -80.0f
+    && NewCameraRot.Pitch <= 80.0f)
+  {
+    Camera->SetWorldRotation(NewCameraRot);
+
+    FVector NewCameraLoc = Camera->RelativeLocation;
+    const float NewRadius = NewCameraLoc.Size();
+    const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
+
+    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
+    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
+
+    Camera->SetRelativeLocation(NewCameraLoc);
+  }
+
   //******** LOOK AROUND ********
 
 
