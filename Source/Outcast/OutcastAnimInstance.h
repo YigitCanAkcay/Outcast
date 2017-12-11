@@ -21,10 +21,10 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     float PlayRate;
 
-  // ---- TORSO ----
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     FRotator TorsoRotation;
-  // ---- TORSO ----
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
+    FRotator LegsRotation;
   //******** BASIC MOVEMENT ********
 
 public:
@@ -43,4 +43,7 @@ public:
 
   void SetTorsoRotation(const FRotator& NewTorsoRotation);
   FRotator GetTorsoRotation() const;
+
+  void SetLegsRotation(const FRotator& NewLegsRotation);
+  FRotator GetLegsRotation() const;
 };

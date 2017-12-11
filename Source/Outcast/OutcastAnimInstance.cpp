@@ -8,7 +8,8 @@ UOutcastAnimInstance::UOutcastAnimInstance(const FObjectInitializer& ObjectIniti
   bIsSlashingLeft(false),
   Speed(0.0f),
   PlayRate(1.0f),
-  TorsoRotation(FRotator())
+  TorsoRotation(FRotator()),
+  LegsRotation(FRotator())
 {
 }
 
@@ -57,4 +58,14 @@ void UOutcastAnimInstance::SetTorsoRotation(const FRotator& NewTorsoRotation)
 FRotator UOutcastAnimInstance::GetTorsoRotation() const
 {
   return TorsoRotation;
+}
+
+void UOutcastAnimInstance::SetLegsRotation(const FRotator& NewLegsRotation)
+{
+  LegsRotation = NewLegsRotation;
+}
+
+FRotator UOutcastAnimInstance::GetLegsRotation() const
+{
+  return LegsRotation;
 }

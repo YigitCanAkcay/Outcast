@@ -161,6 +161,27 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   if (!Direction.IsZero())
   {
+    FRotator LegsRotation = Direction.ToOrientationRotator() - GetActorRotation();
+    LegsRotation.Normalize();
+
+    if (std::abs(std::abs(LegsRotation.Yaw) - 180.0f) < 1.0f)
+    {
+      LegsRotation.Yaw = 0.0f;
+    }
+    else if (std::abs(std::abs(LegsRotation.Yaw) - 135.0f) < 1.0f)
+    {
+      if (LegsRotation.Yaw < 0.0f)
+      {
+        LegsRotation.Yaw = 45.0f;
+      }
+      else
+      {
+        LegsRotation.Yaw = -45.0f;
+      }
+    }
+
+    Anim->SetLegsRotation(LegsRotation);
+
     if (Jumping == EJump::NONE)
     {
       AddMovementInput(Direction, Speed / 5);
@@ -234,25 +255,6 @@ void AOutcastCharacter::Tick(float DeltaTime)
       BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
   }
-  
-  /*FString JumpMode;
-  if (Jumping == EJump::NONE)
-  {
-    JumpMode = "NONE";
-  }
-  else if (Jumping == EJump::Upwards)
-  {
-    JumpMode = "Upwards";
-  }
-  else if (Jumping == EJump::Downwards)
-  {
-    JumpMode = "Downwards";
-  }
-  else if(Jumping == EJump::BunnyHop)
-  {
-    JumpMode = "BUNNYHOP !!!";
-  }
-  UE_LOG(LogTemp, Warning, TEXT("Mode: %s -- JumpHeight: %f"), *JumpMode, JumpHeight);*/
   //******** JUMP ********
 }
 
@@ -340,10 +342,7 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void AOutcastCharacter::WPressed()
 {
-  if (!KeyMap[EKeys::S])
-  {
-    KeyMap.Add(EKeys::W, true);
-  }
+  KeyMap.Add(EKeys::W, true);
 }
 
 void AOutcastCharacter::WReleased()
@@ -353,10 +352,7 @@ void AOutcastCharacter::WReleased()
 
 void AOutcastCharacter::APressed()
 {
-  if (!KeyMap[EKeys::D])
-  {
-    KeyMap.Add(EKeys::A, true);
-  }
+  KeyMap.Add(EKeys::A, true);
 }
 
 void AOutcastCharacter::AReleased()
@@ -366,10 +362,7 @@ void AOutcastCharacter::AReleased()
 
 void AOutcastCharacter::SPressed()
 {
-  if (!KeyMap[EKeys::W])
-  {
-    KeyMap.Add(EKeys::S, true);
-  }
+  KeyMap.Add(EKeys::S, true);
 }
 
 void AOutcastCharacter::SReleased()
@@ -379,10 +372,7 @@ void AOutcastCharacter::SReleased()
 
 void AOutcastCharacter::DPressed()
 {
-  if (!KeyMap[EKeys::A])
-  {
-    KeyMap.Add(EKeys::D, true);
-  }
+  KeyMap.Add(EKeys::D, true);
 }
 
 void AOutcastCharacter::DReleased()
