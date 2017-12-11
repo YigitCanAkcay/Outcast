@@ -1,6 +1,14 @@
 #include "OutcastCharacter.h"
 
 AOutcastCharacter::AOutcastCharacter()
+  :
+  Speed(0.0f),
+  Direction(FVector()),
+  WalkPlayrate(1.0f),
+  Jumping(EJump::NONE),
+  JumpHeight(0.0f),
+  JumpStartLocZ(0.0f),
+  BunnyHopSpeedRatio(DefaultJumpSpeedRatio)
 {
  	PrimaryActorTick.bCanEverTick = true;
 
@@ -41,6 +49,7 @@ AOutcastCharacter::AOutcastCharacter()
   Camera->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
 
   Movement = Cast<UCharacterMovementComponent>(GetMovementComponent());
+  Movement->AirControl = 1.0f;
 
   // Take control of the player
   AutoPossessPlayer = EAutoReceiveInput::Player0;
@@ -56,15 +65,6 @@ void AOutcastCharacter::BeginPlay()
   {
     Destroy();
   }
-
-  Speed              = 0.0f;
-  JumpHeight         = 0.0f;
-  JumpHeightLimit    = 1000.0f;
-  BunnyHopSpeedRatio = 100.0f;
-  MinJumpHeight      = 75.0f;
-  Direction          = FVector();
-
-  Movement->AirControl = 1.0f;
 }
 
 void AOutcastCharacter::Tick(float DeltaTime)
@@ -73,16 +73,16 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   //******** LOOK AROUND ********
   FRotator NewRotation = GetActorRotation();
-  NewRotation.Yaw = NewRotation.Yaw + MouseInput.X;
-  NewRotation.Pitch = NewRotation.Pitch + MouseInput.Y;
-  NewRotation.Pitch = FMath::Clamp(NewRotation.Pitch, -80.0f, 80.0f);
+  NewRotation.Yaw      = NewRotation.Yaw + MouseInput.X;
+  NewRotation.Pitch    = NewRotation.Pitch + MouseInput.Y;
+  NewRotation.Pitch    = FMath::Clamp(NewRotation.Pitch, -80.0f, 80.0f);
 
   SetActorRotation(NewRotation);
   //******** LOOK AROUND ********
 
 
   //******** MOVE AROUND ********
-  Direction = FVector(0.0f, 0.0f, 0.0f);
+  Direction    = FVector(0.0f, 0.0f, 0.0f);
   WalkPlayrate = 1.0f;
 
   //**** DIRECTION ****
@@ -94,21 +94,21 @@ void AOutcastCharacter::Tick(float DeltaTime)
   if (KeyMap[EKeys::A])
   {
     FRotator Rot = GetActorRotation();
-    Rot.Yaw = Rot.Yaw - 90.0f;
-    Direction = Direction + Rot.Vector();
+    Rot.Yaw      = Rot.Yaw - 90.0f;
+    Direction    = Direction + Rot.Vector();
   }
 
   if (KeyMap[EKeys::S])
   {
-    Direction = Direction + GetActorRotation().Vector() * -1;
+    Direction    = Direction + GetActorRotation().Vector() * -1;
     WalkPlayrate = -1.0f;
   }
 
   if (KeyMap[EKeys::D])
   {
     FRotator Rot = GetActorRotation();
-    Rot.Yaw = Rot.Yaw + 90.0f;
-    Direction = Direction + Rot.Vector();
+    Rot.Yaw      = Rot.Yaw + 90.0f;
+    Direction    = Direction + Rot.Vector();
   }
   //**** DIRECTION ****
 
@@ -146,7 +146,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
     }
     else
     {
-      AddMovementInput(Direction, Speed / 100);
+      AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
     }
   }
 
@@ -203,14 +203,14 @@ void AOutcastCharacter::Tick(float DeltaTime)
     JumpHeight = GetActorLocation().Z - JumpStartLocZ;
 
     AddMovementInput(GetActorUpVector(), 5.0f);
-    if (JumpHeight > 100.0f)
+    if (JumpHeight > BunnyHopMaxHeight)
     {
       Jumping            = EJump::Upwards;
-      BunnyHopSpeedRatio = 100.0f;
+      BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
   }
   
-  FString JumpMode;
+  /*FString JumpMode;
   if (Jumping == EJump::NONE)
   {
     JumpMode = "NONE";
@@ -227,7 +227,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
   {
     JumpMode = "BUNNYHOP !!!";
   }
-  UE_LOG(LogTemp, Warning, TEXT("Mode: %s -- JumpHeight: %f"), *JumpMode, JumpHeight);
+  UE_LOG(LogTemp, Warning, TEXT("Mode: %s -- JumpHeight: %f"), *JumpMode, JumpHeight);*/
   //******** JUMP ********
 }
 
@@ -399,14 +399,14 @@ void AOutcastCharacter::OnHit(
     {
       Jumping            = EJump::BunnyHop;
       JumpHeight         = 0.0f;
-      BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, 10.0f, 100.0f);
+      BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, 20.0f, 50.0f);
       Anim->SetIsJumping(false);
       Movement->SetMovementMode(MOVE_Flying);
     }
     else
     {
       Jumping            = EJump::NONE;
-      BunnyHopSpeedRatio = 100.0f;
+      BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
       Movement->SetMovementMode(MOVE_Walking);
     }
   }

@@ -33,6 +33,9 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** ANIMATION ********
   UOutcastAnimInstance* Anim;
+  //******** ANIMATION ********
+
+  //******** BASIC MOVEMENT ********
   float Speed;
   FVector Direction;
   float WalkPlayrate;
@@ -46,12 +49,15 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   };
   EJump Jumping;
   float JumpHeight;
-  float JumpHeightLimit;
   float JumpStartLocZ;
-  float MinJumpHeight;
-  float BunnyHopSpeedRatio;
+  const float JumpHeightLimit = 1000.0f;
+  const float MinJumpHeight   = 75.0f;
 
-  //******** ANIMATION ********
+  float BunnyHopSpeedRatio;
+  const float DefaultJumpSpeedRatio = 50.0f;
+  const float BunnyHopMaxHeight         = 100.0f;
+  //******** BASIC MOVEMENT ********
+
 
   //******** KEYBOARD INPUT ********
   enum class EKeys
