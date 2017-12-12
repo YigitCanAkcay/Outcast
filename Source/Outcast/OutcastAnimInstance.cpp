@@ -9,7 +9,8 @@ UOutcastAnimInstance::UOutcastAnimInstance(const FObjectInitializer& ObjectIniti
   Speed(0.0f),
   PlayRate(1.0f),
   TorsoRotation(FRotator()),
-  LegsRotation(FRotator())
+  LegsRotation(FRotator()),
+  CurrentLegsRotationBufferIndex(0)
 {
 }
 
@@ -62,7 +63,30 @@ FRotator UOutcastAnimInstance::GetTorsoRotation() const
 
 void UOutcastAnimInstance::SetLegsRotation(const FRotator& NewLegsRotation)
 {
-  LegsRotation = NewLegsRotation;
+  if (CurrentLegsRotationBufferIndex == 10)
+  {
+    CurrentLegsRotationBufferIndex = 0;
+  }
+
+  if (LegsRotationBuffer.Num() - 1 >= CurrentLegsRotationBufferIndex)
+  {
+    LegsRotationBuffer[CurrentLegsRotationBufferIndex] = NewLegsRotation;
+  }
+  else
+  {
+    LegsRotationBuffer.Add(NewLegsRotation);
+  }
+
+  ++CurrentLegsRotationBufferIndex;
+
+  LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+  for (FRotator Rotation : LegsRotationBuffer)
+  {
+    LegsRotation = LegsRotation + Rotation;
+  }
+
+  const float LegsRotationBufferNum = static_cast<float>(LegsRotationBuffer.Num());
+  LegsRotation = FRotator(LegsRotation.Pitch / LegsRotationBufferNum, LegsRotation.Yaw / LegsRotationBufferNum, LegsRotation.Roll / LegsRotationBufferNum);
 }
 
 FRotator UOutcastAnimInstance::GetLegsRotation() const

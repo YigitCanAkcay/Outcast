@@ -5,6 +5,7 @@ AOutcastCharacter::AOutcastCharacter()
   Speed(0.0f),
   Direction(FVector()),
   WalkPlayrate(1.0f),
+  LegsRotation(FRotator()),
   Jumping(EJump::NONE),
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
@@ -113,7 +114,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
   //**** DIRECTION ****
   if (KeyMap[EKeys::W])
   {
-    Direction = Direction + GetActorRotation().Vector();
+    Direction   = Direction + GetActorRotation().Vector();
   }
 
   if (KeyMap[EKeys::A])
@@ -143,45 +144,64 @@ void AOutcastCharacter::Tick(float DeltaTime)
     || KeyMap[EKeys::S]
     || KeyMap[EKeys::D])
   {
-    Speed = FMath::Clamp(Speed + 5.0f, 0.0f, 100.0f);
+    Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
   }
   else
   {
-    Speed = FMath::Clamp(Speed - 5.0f, 0.0f, 100.0f);
-  }
-  //**** SPEED ****
-
-  if (Speed == 0.0f)
-  {
-    Direction = FVector(0.0f, 0.0f, 0.0f);
+    Speed = FMath::Clamp(Speed - 5.0f, MinSpeed, MaxSpeed);
   }
 
   Anim->SetAcceleration(Speed);
   Anim->SetWalkPlayrate(WalkPlayrate);
+  if (Speed == 0.0f)
+  {
+    Direction = GetActorRotation().Vector();
+  }
+  //**** SPEED ****
+
+  //**** LEGS ROTATION ****
+  if (KeyMap[EKeys::W])
+  {
+    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+    if (KeyMap[EKeys::A])
+    {
+      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+    }
+    else if (KeyMap[EKeys::D])
+    {
+      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+    }
+  }
+  else if (KeyMap[EKeys::S])
+  {
+    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+    if (KeyMap[EKeys::A])
+    {
+      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+    }
+    else if (KeyMap[EKeys::D])
+    {
+      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+    }
+  }
+  else if (KeyMap[EKeys::A])
+  {
+    LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
+  }
+  else if (KeyMap[EKeys::D])
+  {
+    LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
+  }
+  else
+  {
+    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+  }
+
+  Anim->SetLegsRotation(LegsRotation);
+  //**** LEGS ROTATION ****
 
   if (!Direction.IsZero())
   {
-    FRotator LegsRotation = Direction.ToOrientationRotator() - GetActorRotation();
-    LegsRotation.Normalize();
-
-    if (std::abs(std::abs(LegsRotation.Yaw) - 180.0f) < 1.0f)
-    {
-      LegsRotation.Yaw = 0.0f;
-    }
-    else if (std::abs(std::abs(LegsRotation.Yaw) - 135.0f) < 1.0f)
-    {
-      if (LegsRotation.Yaw < 0.0f)
-      {
-        LegsRotation.Yaw = 45.0f;
-      }
-      else
-      {
-        LegsRotation.Yaw = -45.0f;
-      }
-    }
-
-    Anim->SetLegsRotation(LegsRotation);
-
     if (Jumping == EJump::NONE)
     {
       AddMovementInput(Direction, Speed / 5);
@@ -410,11 +430,13 @@ void AOutcastCharacter::OnHit(
   // Character is on top of a walkable plane
   if (OtherActor->ActorHasTag(FName("Walkable")))
   {
-    if (KeyMap[EKeys::Space] && Jumping == EJump::Downwards || Jumping == EJump::BunnyHop)
+    if (KeyMap[EKeys::Space] 
+      && (KeyMap[EKeys::A] || KeyMap[EKeys::D]) 
+      && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
     {
       Jumping            = EJump::BunnyHop;
       JumpHeight         = 0.0f;
-      BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, 20.0f, 50.0f);
+      BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, BunnyHopFastestSpeedRatio, DefaultJumpSpeedRatio);
       Anim->SetIsJumping(false);
       Movement->SetMovementMode(MOVE_Flying);
     }

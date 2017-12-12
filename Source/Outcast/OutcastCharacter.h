@@ -37,8 +37,11 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** BASIC MOVEMENT ********
   float Speed;
+  const float MaxSpeed = 100.0f;
+  const float MinSpeed = 0.0f;
   FVector Direction;
   float WalkPlayrate;
+  FRotator LegsRotation;
 
   enum class EJump
   {
@@ -54,8 +57,9 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   const float MinJumpHeight   = 75.0f;
 
   float BunnyHopSpeedRatio;
-  const float DefaultJumpSpeedRatio = 50.0f;
+  const float DefaultJumpSpeedRatio     = 120.0f;
   const float BunnyHopMaxHeight         = 100.0f;
+  const float BunnyHopFastestSpeedRatio = 20.0f;
   //******** BASIC MOVEMENT ********
 
 
@@ -95,6 +99,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void MouseRightLeft(const float AxisValue);
   //******** KEYBOARD INPUT ********
 
+  //******** COLLISION ********
   UFUNCTION()
   void OnHit(
     UPrimitiveComponent* HitComp,
@@ -102,6 +107,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
     UPrimitiveComponent* OtherComp, 
     FVector NormalImpulse, 
     const FHitResult& Hit);
+  //******** COLLISION ********
 
 public:
 	AOutcastCharacter();
@@ -114,7 +120,4 @@ public:
 
 	virtual void SetupPlayerInputComponent(
     class UInputComponent* PlayerInputComponent) override;
-
-	
-	
 };

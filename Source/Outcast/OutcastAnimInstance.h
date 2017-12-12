@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
 #include "OutcastAnimInstance.generated.h"
 
 
@@ -25,6 +26,9 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
     FRotator TorsoRotation;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     FRotator LegsRotation;
+
+  TArray<FRotator> LegsRotationBuffer;
+  int CurrentLegsRotationBufferIndex;
   //******** BASIC MOVEMENT ********
 
 public:
