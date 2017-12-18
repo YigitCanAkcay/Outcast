@@ -20,6 +20,12 @@ AOutcastCharacter::AOutcastCharacter()
     SkeletalMeshComp->SetSkeletalMesh(Mesh.Object);
   }
 
+  static ConstructorHelpers::FObjectFinder<USkeletalMesh> Weap(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Sword.SK_Cat_Sword'"));
+  if (Weap.Succeeded())
+  {
+    WeaponMesh = Weap.Object;
+  }
+
   static ConstructorHelpers::FObjectFinder<UClass> AnimBP(TEXT("Class'/Game/Feline_Warrior/Animations/Character_Animation_BP.Character_Animation_BP_C'"));
   if (AnimBP.Succeeded())
   {
@@ -41,6 +47,19 @@ AOutcastCharacter::AOutcastCharacter()
   {
     SkeletalMeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
     SkeletalMeshComp->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+  }
+
+  if (WeaponMesh && GetWorld())
+  {
+    FVector Location;
+    AActor* WeaponActor = GetWorld()->SpawnActor(ASkeletalMeshActor::StaticClass(), &Location);
+    Cast<ASkeletalMeshActor>(WeaponActor)->GetSkeletalMeshComponent()->SetSkeletalMesh(WeaponMesh);
+
+    FName SwordSocket = TEXT("Sword");
+    WeaponActor->AttachToComponent(
+      SkeletalMeshComp, 
+      FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), 
+      SwordSocket);
   }
 
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -276,24 +295,28 @@ void AOutcastCharacter::Tick(float DeltaTime)
     }
   }
   //******** JUMP ********
+
+  //******** ATTACK ********
+  // Check if a sword attack is being executed or not
+  if (Anim->GetIsSlashingLeft())
+  {
+    Anim->SetIsSwordAttacking(true);
+  }
+  else
+  {
+    Anim->SetIsSwordAttacking(false);
+  }
+
+  if (MouseMap[EMouse::Left] && KeyMap[EKeys::A])
+  {
+    Anim->SetIsSlashingLeft(true);
+  }
+  //******** ATTACK ********
 }
 
 void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-  // Initialize Mouse Input
-  MouseInput = FVector2D(0.0f, 0.0f);
-
-  // Bind axes
-  PlayerInputComponent->BindAxis(
-    "MouseUpDown",
-    this,
-    &AOutcastCharacter::MouseUpDown);
-  PlayerInputComponent->BindAxis(
-    "MouseRightLeft",
-    this,
-    &AOutcastCharacter::MouseRightLeft);
 
   // Initialize KeyMap
   KeyMap.Add(EKeys::W, false);
@@ -358,6 +381,42 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     this,
     &AOutcastCharacter::SpaceReleased);
 
+  // Initialize Mouse Input
+  MouseInput = FVector2D(0.0f, 0.0f);
+  MouseMap.Add(EMouse::Left, false);
+  MouseMap.Add(EMouse::Right, false);
+
+  // Mouse input
+  PlayerInputComponent->BindAction(
+    "MouseLeft",
+    IE_Pressed,
+    this,
+    &AOutcastCharacter::MouseLeftPressed);
+  PlayerInputComponent->BindAction(
+    "MouseRight",
+    IE_Pressed,
+    this,
+    &AOutcastCharacter::MouseRightPressed);
+
+  PlayerInputComponent->BindAction(
+    "MouseLeft",
+    IE_Released,
+    this,
+    &AOutcastCharacter::MouseLeftReleased);
+  PlayerInputComponent->BindAction(
+    "MouseRight",
+    IE_Released,
+    this,
+    &AOutcastCharacter::MouseRightReleased);
+
+  PlayerInputComponent->BindAxis(
+    "MouseUpDown",
+    this,
+    &AOutcastCharacter::MouseUpDown);
+  PlayerInputComponent->BindAxis(
+    "MouseRightLeft",
+    this,
+    &AOutcastCharacter::MouseRightLeft);
 }
 
 void AOutcastCharacter::WPressed()
@@ -408,6 +467,26 @@ void AOutcastCharacter::SpacePressed()
 void AOutcastCharacter::SpaceReleased()
 {
   KeyMap.Add(EKeys::Space, false);
+}
+
+void AOutcastCharacter::MouseLeftPressed()
+{
+  MouseMap.Add(EMouse::Left, true);
+}
+
+void AOutcastCharacter::MouseRightPressed()
+{
+  MouseMap.Add(EMouse::Right, true);
+}
+
+void AOutcastCharacter::MouseLeftReleased()
+{
+  MouseMap.Add(EMouse::Left, false);
+}
+
+void AOutcastCharacter::MouseRightReleased()
+{
+  MouseMap.Add(EMouse::Right, false);
 }
 
 void AOutcastCharacter::MouseUpDown(const float AxisValue)

@@ -9,6 +9,8 @@
 #include "Runtime/Engine/Classes/Camera/CameraComponent.h"
 #include "Runtime/Engine/Classes/Components/CapsuleComponent.h"
 #include "Runtime/Engine/Classes/GameFramework/CharacterMovementComponent.h"
+#include "Runtime/Engine/Classes/Animation/SkeletalMeshActor.h"
+#include "Runtime/Engine/Classes/Engine/SkeletalMeshSocket.h"
 
 #include "OutcastAnimInstance.h"
 
@@ -22,6 +24,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COMPONENTS ********
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
     USkeletalMeshComponent* SkeletalMeshComp;
+  UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
+    USkeletalMesh* WeaponMesh;
 
   UCapsuleComponent* Capsule;
 
@@ -63,7 +67,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** BASIC MOVEMENT ********
 
 
-  //******** KEYBOARD INPUT ********
+  //******** PLAYER INPUT ********
   enum class EKeys
   {
     W,
@@ -95,9 +99,14 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void SpaceReleased();
 
   FVector2D MouseInput;
+  TMap<EMouse, bool> MouseMap;
+  void MouseLeftPressed();
+  void MouseRightPressed();
+  void MouseLeftReleased();
+  void MouseRightReleased();
   void MouseUpDown(const float AxisValue);
   void MouseRightLeft(const float AxisValue);
-  //******** KEYBOARD INPUT ********
+  //******** PLAYER INPUT ********
 
   //******** COLLISION ********
   UFUNCTION()

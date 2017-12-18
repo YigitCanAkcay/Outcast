@@ -37,6 +37,15 @@ bool UOutcastAnimInstance::GetIsJumping() const
   return bIsJumping;
 }
 
+void UOutcastAnimInstance::SetIsSwordAttacking(const bool bNewIsSwordAttacking)
+{
+  bIsSwordAttacking = bNewIsSwordAttacking;
+}
+bool UOutcastAnimInstance::GetIsSwordAttacking() const
+{
+  return bIsSwordAttacking;
+}
+
 void UOutcastAnimInstance::SetIsSlashingLeft(const bool bNewIsSlashingLeft)
 {
   bIsSlashingLeft = bNewIsSlashingLeft;

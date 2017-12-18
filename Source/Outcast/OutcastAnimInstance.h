@@ -18,8 +18,6 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     float Speed;  
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    bool bIsSlashingLeft;
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     float PlayRate;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
@@ -31,6 +29,13 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
   int CurrentLegsRotationBufferIndex;
   //******** BASIC MOVEMENT ********
 
+  //******** ATTACKING ********
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
+    bool bIsSwordAttacking;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
+    bool bIsSlashingLeft;
+  //******** ATTACKING ********
+
 public:
   void SetIsRunning(const bool bNewIsRunning);
   bool GetIsRunning() const;
@@ -39,6 +44,9 @@ public:
 
   void SetIsJumping(const bool bNewIsJumping);
   bool GetIsJumping() const;
+
+  void SetIsSwordAttacking(const bool bNewIsSwordAttacking);
+  bool GetIsSwordAttacking() const;
 
   void SetIsSlashingLeft(const bool bNewIsSlashingLeft);
   bool GetIsSlashingLeft() const;
