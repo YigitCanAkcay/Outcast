@@ -25,7 +25,11 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
     USkeletalMeshComponent* SkeletalMeshComp;
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
+    USkeletalMeshComponent* SkeletalMeshCompWeapon;
+  UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
     USkeletalMesh* WeaponMesh;
+  UPROPERTY(VisibleAnywhere)
+    ASkeletalMeshActor* WeaponActor;
 
   UCapsuleComponent* Capsule;
 

@@ -18,18 +18,38 @@ AOutcastCharacter::AOutcastCharacter()
   {
     SkeletalMeshComp = GetMesh();
     SkeletalMeshComp->SetSkeletalMesh(Mesh.Object);
+
+    static ConstructorHelpers::FObjectFinder<UClass> AnimBP(TEXT("Class'/Game/Feline_Warrior/Animations/Character_Animation_BP.Character_Animation_BP_C'"));
+    if (AnimBP.Succeeded())
+    {
+      SkeletalMeshComp->SetAnimInstanceClass(AnimBP.Object);
+    }
+
+    SkeletalMeshComp->RegisterComponent();
+    SkeletalMeshComp->SetupAttachment(Capsule);
+    SkeletalMeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
+    SkeletalMeshComp->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
   }
 
   static ConstructorHelpers::FObjectFinder<USkeletalMesh> Weap(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Sword.SK_Cat_Sword'"));
   if (Weap.Succeeded())
   {
     WeaponMesh = Weap.Object;
-  }
 
-  static ConstructorHelpers::FObjectFinder<UClass> AnimBP(TEXT("Class'/Game/Feline_Warrior/Animations/Character_Animation_BP.Character_Animation_BP_C'"));
-  if (AnimBP.Succeeded())
-  {
-    SkeletalMeshComp->SetAnimInstanceClass(AnimBP.Object);
+    SkeletalMeshCompWeapon = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Sword")));
+    if (SkeletalMeshCompWeapon)
+    {
+      SkeletalMeshCompWeapon->SetSkeletalMesh(WeaponMesh);
+    }
+
+    if (SkeletalMeshComp)
+    {
+      const FName SwordSocket = TEXT("Sword");
+      SkeletalMeshCompWeapon->AttachToComponent(
+        SkeletalMeshComp,
+        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+        SwordSocket);
+    }
   }
 
   Capsule = Cast<UCapsuleComponent>(RootComponent);
@@ -41,25 +61,6 @@ AOutcastCharacter::AOutcastCharacter()
     Capsule->SetRelativeLocation(FVector(0.0f, 0.0f, 122.0f));
     Capsule->OnComponentHit.__Internal_AddDynamic(this, &AOutcastCharacter::OnHit, FName("OnHit"));
 
-  }
-
-  if (SkeletalMeshComp)
-  {
-    SkeletalMeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
-    SkeletalMeshComp->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
-  }
-
-  if (WeaponMesh && GetWorld())
-  {
-    FVector Location;
-    AActor* WeaponActor = GetWorld()->SpawnActor(ASkeletalMeshActor::StaticClass(), &Location);
-    Cast<ASkeletalMeshActor>(WeaponActor)->GetSkeletalMeshComponent()->SetSkeletalMesh(WeaponMesh);
-
-    FName SwordSocket = TEXT("Sword");
-    WeaponActor->AttachToComponent(
-      SkeletalMeshComp, 
-      FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true), 
-      SwordSocket);
   }
 
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -133,7 +134,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
   //**** DIRECTION ****
   if (KeyMap[EKeys::W])
   {
-    Direction   = Direction + GetActorRotation().Vector();
+    Direction = Direction + GetActorRotation().Vector();
   }
 
   if (KeyMap[EKeys::A])
