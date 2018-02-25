@@ -25,7 +25,6 @@ AOutcastCharacter::AOutcastCharacter()
       SkeletalMeshComp->SetAnimInstanceClass(AnimBP.Object);
     }
 
-    SkeletalMeshComp->RegisterComponent();
     SkeletalMeshComp->SetupAttachment(Capsule);
     SkeletalMeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
     SkeletalMeshComp->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
@@ -257,7 +256,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
       }
     }
   }
-  else if ((Jumping == EJump::Upwards|| Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
+  else if ((Jumping == EJump::Upwards || Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
   {
     Jumping = EJump::Downwards;
   }
@@ -297,7 +296,9 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   //******** ATTACK ********
   // Check if a sword attack is being executed or not
-  if (Anim->GetIsSlashingLeft())
+  if (Anim->GetIsSlashingLeft()
+    || Anim->GetIsSlashingRight()
+    || Anim->GetIsSlashingForward())
   {
     Anim->SetIsSwordAttacking(true);
   }
@@ -305,11 +306,20 @@ void AOutcastCharacter::Tick(float DeltaTime)
   {
     Anim->SetIsSwordAttacking(false);
   }
-
+  
   if (MouseMap[EMouse::Left] && KeyMap[EKeys::A])
   {
     Anim->SetIsSlashingLeft(true);
   }
+  if (MouseMap[EMouse::Left] && KeyMap[EKeys::D])
+  {
+    Anim->SetIsSlashingRight(true);
+  }
+  if (MouseMap[EMouse::Left] && KeyMap[EKeys::W])
+  {
+    Anim->SetIsSlashingForward(true);
+  }
+
   //******** ATTACK ********
 }
 

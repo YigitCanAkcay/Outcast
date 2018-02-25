@@ -55,6 +55,24 @@ bool UOutcastAnimInstance::GetIsSlashingLeft() const
   return bIsSlashingLeft;
 }
 
+void UOutcastAnimInstance::SetIsSlashingRight(const bool bNewIsSlashingRight)
+{
+  bIsSlashingRight = bNewIsSlashingRight;
+}
+bool UOutcastAnimInstance::GetIsSlashingRight() const
+{
+  return bIsSlashingRight;
+}
+
+void UOutcastAnimInstance::SetIsSlashingForward(const bool bNewIsSlashingForward)
+{
+  bIsSlashingForward = bNewIsSlashingForward;
+}
+bool UOutcastAnimInstance::GetIsSlashingForward() const
+{
+  return bIsSlashingForward;
+}
+
 void UOutcastAnimInstance::SetWalkPlayrate(const float NewPlayRate)
 {
   PlayRate = NewPlayRate;

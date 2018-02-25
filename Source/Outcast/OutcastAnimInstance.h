@@ -34,6 +34,10 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
     bool bIsSwordAttacking;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     bool bIsSlashingLeft;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
+    bool bIsSlashingRight;
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
+    bool bIsSlashingForward;
   //******** ATTACKING ********
 
 public:
@@ -50,6 +54,12 @@ public:
 
   void SetIsSlashingLeft(const bool bNewIsSlashingLeft);
   bool GetIsSlashingLeft() const;
+
+  void SetIsSlashingRight(const bool bNewIsSlashingRight);
+  bool GetIsSlashingRight() const;
+
+  void SetIsSlashingForward(const bool bNewIsSlashingForward);
+  bool GetIsSlashingForward() const;
 
   void SetWalkPlayrate(const float NewPlayRate);
 
