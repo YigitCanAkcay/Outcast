@@ -34,12 +34,10 @@ AOutcastCharacter::AOutcastCharacter()
   static ConstructorHelpers::FObjectFinder<USkeletalMesh> Weap(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Sword.SK_Cat_Sword'"));
   if (Weap.Succeeded())
   {
-    WeaponMesh = Weap.Object;
-
     SkeletalMeshCompWeapon = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Sword")));
     if (SkeletalMeshCompWeapon)
     {
-      SkeletalMeshCompWeapon->SetSkeletalMesh(WeaponMesh);
+      SkeletalMeshCompWeapon->SetSkeletalMesh(Weap.Object);
     }
 
     if (SkeletalMeshComp)
