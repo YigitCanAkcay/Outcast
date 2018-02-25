@@ -319,7 +319,6 @@ void AOutcastCharacter::Tick(float DeltaTime)
   {
     Anim->SetIsSlashingForward(true);
   }
-
   //******** ATTACK ********
 }
 
