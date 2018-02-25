@@ -31,7 +31,7 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
 
   //******** ATTACKING ********
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    bool bIsSwordAttacking;
+    float AttackMovementBlendWeight;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
     bool bIsSlashingLeft;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
@@ -49,8 +49,10 @@ public:
   void SetIsJumping(const bool bNewIsJumping);
   bool GetIsJumping() const;
 
-  void SetIsSwordAttacking(const bool bNewIsSwordAttacking);
-  bool GetIsSwordAttacking() const;
+  void AddAttackMovementBlendWeight(const float DeltaAttackMovementBlendWeight);
+  void SubtractAttackMovementBlendWeight(const float DeltaAttackMovementBlendWeight);
+  void SetAttackMovementBlendWeight(const float NewAttackMovementBlendWeight);
+  float GetAttackMovementBlendWeight() const;
 
   void SetIsSlashingLeft(const bool bNewIsSlashingLeft);
   bool GetIsSlashingLeft() const;

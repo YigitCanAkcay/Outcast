@@ -295,16 +295,16 @@ void AOutcastCharacter::Tick(float DeltaTime)
   //******** JUMP ********
 
   //******** ATTACK ********
-  // Check if a sword attack is being executed or not
+  // Specify the blend weight for sword attacks/basic movement
   if (Anim->GetIsSlashingLeft()
     || Anim->GetIsSlashingRight()
     || Anim->GetIsSlashingForward())
   {
-    Anim->SetIsSwordAttacking(true);
+    Anim->AddAttackMovementBlendWeight(0.1f);
   }
   else
   {
-    Anim->SetIsSwordAttacking(false);
+    Anim->SubtractAttackMovementBlendWeight(0.1f);
   }
   
   if (MouseMap[EMouse::Left] && KeyMap[EKeys::A])

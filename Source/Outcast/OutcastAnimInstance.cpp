@@ -5,7 +5,10 @@ UOutcastAnimInstance::UOutcastAnimInstance(const FObjectInitializer& ObjectIniti
   Super(ObjectInitializer),
   bIsJumping(false),
   bIsRunning(false),
+  AttackMovementBlendWeight(0.0f),
   bIsSlashingLeft(false),
+  bIsSlashingRight(false),
+  bIsSlashingForward(false),
   Speed(0.0f),
   PlayRate(1.0f),
   TorsoRotation(FRotator()),
@@ -37,13 +40,23 @@ bool UOutcastAnimInstance::GetIsJumping() const
   return bIsJumping;
 }
 
-void UOutcastAnimInstance::SetIsSwordAttacking(const bool bNewIsSwordAttacking)
+void UOutcastAnimInstance::AddAttackMovementBlendWeight(const float DeltaAttackMovementBlendWeight)
 {
-  bIsSwordAttacking = bNewIsSwordAttacking;
+  AttackMovementBlendWeight = FMath::Clamp(AttackMovementBlendWeight + DeltaAttackMovementBlendWeight, 0.0f, 1.0f);
 }
-bool UOutcastAnimInstance::GetIsSwordAttacking() const
+
+void UOutcastAnimInstance::SubtractAttackMovementBlendWeight(const float DeltaAttackMovementBlendWeight)
 {
-  return bIsSwordAttacking;
+  AttackMovementBlendWeight = FMath::Clamp(AttackMovementBlendWeight - DeltaAttackMovementBlendWeight, 0.0f, 1.0f);
+}
+
+void UOutcastAnimInstance::SetAttackMovementBlendWeight(const float NewAttackMovementBlendWeight)
+{
+  AttackMovementBlendWeight = NewAttackMovementBlendWeight;
+}
+float UOutcastAnimInstance::GetAttackMovementBlendWeight() const
+{
+  return AttackMovementBlendWeight;
 }
 
 void UOutcastAnimInstance::SetIsSlashingLeft(const bool bNewIsSlashingLeft)
