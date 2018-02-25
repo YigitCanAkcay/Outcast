@@ -13,39 +13,77 @@ AOutcastCharacter::AOutcastCharacter()
 {
  	PrimaryActorTick.bCanEverTick = true;
 
-  static ConstructorHelpers::FObjectFinder<USkeletalMesh> Mesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Warrior.SK_Cat_Warrior'"));
-  if (Mesh.Succeeded())
+  static ConstructorHelpers::FObjectFinder<USkeletalMesh> BodyMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Warrior.SK_Cat_Warrior'"));
+  if (BodyMesh.Succeeded())
   {
-    SkeletalMeshComp = GetMesh();
-    SkeletalMeshComp->SetSkeletalMesh(Mesh.Object);
+    Body = GetMesh();
+    Body->SetSkeletalMesh(BodyMesh.Object);
 
     static ConstructorHelpers::FObjectFinder<UClass> AnimBP(TEXT("Class'/Game/Feline_Warrior/Animations/Character_Animation_BP.Character_Animation_BP_C'"));
     if (AnimBP.Succeeded())
     {
-      SkeletalMeshComp->SetAnimInstanceClass(AnimBP.Object);
+      Body->SetAnimInstanceClass(AnimBP.Object);
     }
 
-    SkeletalMeshComp->SetupAttachment(Capsule);
-    SkeletalMeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
-    SkeletalMeshComp->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+    Body->SetupAttachment(Capsule);
+    Body->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
+    Body->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
   }
 
-  static ConstructorHelpers::FObjectFinder<USkeletalMesh> Weap(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Sword.SK_Cat_Sword'"));
-  if (Weap.Succeeded())
+  static ConstructorHelpers::FObjectFinder<USkeletalMesh> WeaponMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Sword.SK_Cat_Sword'"));
+  if (WeaponMesh.Succeeded())
   {
-    SkeletalMeshCompWeapon = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Sword")));
-    if (SkeletalMeshCompWeapon)
-    {
-      SkeletalMeshCompWeapon->SetSkeletalMesh(Weap.Object);
-    }
+    Weapon = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Sword")));
+    Weapon->SetSkeletalMesh(WeaponMesh.Object);
 
-    if (SkeletalMeshComp)
+    if (Body)
     {
       const FName SwordSocket = TEXT("Sword");
-      SkeletalMeshCompWeapon->AttachToComponent(
-        SkeletalMeshComp,
+      Weapon->AttachToComponent(
+        Body,
         FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
         SwordSocket);
+    }
+  }
+
+  static ConstructorHelpers::FObjectFinder<USkeletalMesh> EyeballMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Eyeball.SK_Cat_Eyeball'"));
+  if (EyeballMesh.Succeeded())
+  {
+    Eye_R = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Eye_R")));
+    Eye_R->SetSkeletalMesh(EyeballMesh.Object);
+
+    Eye_L = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Eye_L")));
+    Eye_L->SetSkeletalMesh(EyeballMesh.Object);
+
+    if (Body)
+    {
+      const FName EyeSocket_R = TEXT("Eye_R");
+      const FName EyeSocket_L = TEXT("Eye_L");
+
+      Eye_R->AttachToComponent(
+        Body,
+        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+        EyeSocket_R);
+      Eye_L->AttachToComponent(
+        Body,
+        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+        EyeSocket_L);
+    }
+  }
+
+  static ConstructorHelpers::FObjectFinder<USkeletalMesh> ArmorMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Chest.SK_Cat_Chest'"));
+  if (ArmorMesh.Succeeded())
+  {
+    Armor = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Armor")));
+    Armor->SetSkeletalMesh(ArmorMesh.Object);
+
+    if (Body)
+    {
+      const FName ArmorSocket = TEXT("Chest");
+      Armor->AttachToComponent(
+        Body,
+        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+        ArmorSocket);
     }
   }
 
@@ -79,7 +117,7 @@ void AOutcastCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-  Anim = Cast<UOutcastAnimInstance>(SkeletalMeshComp->GetAnimInstance());
+  Anim = Cast<UOutcastAnimInstance>(Body->GetAnimInstance());
   if (!Anim)
   {
     Destroy();
