@@ -37,7 +37,7 @@ AOutcastCharacter::AOutcastCharacter()
       Body->SetAnimInstanceClass(AnimBP.Object);
     }
 
-    Body->SetupAttachment(Capsule);
+    Body->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
     Body->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
   }
 
@@ -123,15 +123,6 @@ AOutcastCharacter::AOutcastCharacter()
   bUseControllerRotationYaw   = false;
   bUseControllerRotationPitch = false;
   bUseControllerRotationRoll  = false;
-
-  AutoPossessPlayer = EAutoReceiveInput::Player0;
-
-  // Server related
-  if (HasAuthority())
-  {
-    //SetReplicates(true);
-    //SetReplicateMovement(true);
-  }
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -142,6 +133,13 @@ void AOutcastCharacter::BeginPlay()
   if (!Anim)
   {
     Destroy();
+  }
+
+  // Server related
+  if (HasAuthority())
+  {
+    SetReplicates(true);
+    SetReplicateMovement(true);
   }
 }
 

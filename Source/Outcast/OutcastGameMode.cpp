@@ -3,7 +3,8 @@
 
 AOutcastGameMode::AOutcastGameMode()
 {
-  DefaultPawnClass = AOutcastCharacter::StaticClass();//ASpectatorPawn::StaticClass();
+  DefaultPawnClass = AOutcastCharacter::StaticClass();
+  //DefaultPawnClass = ASpectatorPawn::StaticClass();
 }
 
 void AOutcastGameMode::PostLogin(APlayerController* NewPlayer)
