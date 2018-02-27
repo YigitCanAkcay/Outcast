@@ -13,6 +13,18 @@ AOutcastCharacter::AOutcastCharacter()
 {
  	PrimaryActorTick.bCanEverTick = true;
 
+  // Initialize KeyMap
+  KeyMap.Add(EKeys::W, false);
+  KeyMap.Add(EKeys::A, false);
+  KeyMap.Add(EKeys::S, false);
+  KeyMap.Add(EKeys::D, false);
+  KeyMap.Add(EKeys::Space, false);
+
+  // Initialize Mouse Input
+  MouseInput = FVector2D::ZeroVector;
+  MouseMap.Add(EMouse::Left, false);
+  MouseMap.Add(EMouse::Right, false);
+
   static ConstructorHelpers::FObjectFinder<USkeletalMesh> BodyMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Warrior.SK_Cat_Warrior'"));
   if (BodyMesh.Succeeded())
   {
@@ -26,7 +38,6 @@ AOutcastCharacter::AOutcastCharacter()
     }
 
     Body->SetupAttachment(Capsule);
-    Body->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
     Body->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
   }
 
@@ -95,7 +106,6 @@ AOutcastCharacter::AOutcastCharacter()
 
     Capsule->SetRelativeLocation(FVector(0.0f, 0.0f, 122.0f));
     Capsule->OnComponentHit.__Internal_AddDynamic(this, &AOutcastCharacter::OnHit, FName("OnHit"));
-
   }
 
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -107,10 +117,21 @@ AOutcastCharacter::AOutcastCharacter()
   Movement               = Cast<UCharacterMovementComponent>(GetMovementComponent());
   Movement->AirControl   = 1.0f;
   Movement->MaxWalkSpeed = 1000.0f;
+  Movement->MaxFlySpeed  = 10000.0f;
+  Movement->GravityScale = 2.25f;
 
-  // Take control of the player
+  bUseControllerRotationYaw   = false;
+  bUseControllerRotationPitch = false;
+  bUseControllerRotationRoll  = false;
+
   AutoPossessPlayer = EAutoReceiveInput::Player0;
 
+  // Server related
+  if (HasAuthority())
+  {
+    //SetReplicates(true);
+    //SetReplicateMovement(true);
+  }
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -364,13 +385,6 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-  // Initialize KeyMap
-  KeyMap.Add(EKeys::W, false);
-  KeyMap.Add(EKeys::A, false);
-  KeyMap.Add(EKeys::S, false);
-  KeyMap.Add(EKeys::D, false);
-  KeyMap.Add(EKeys::Space, false);
-
   // Keyboard input
   PlayerInputComponent->BindAction(
     "W",
@@ -426,11 +440,6 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     IE_Released,
     this,
     &AOutcastCharacter::SpaceReleased);
-
-  // Initialize Mouse Input
-  MouseInput = FVector2D(0.0f, 0.0f);
-  MouseMap.Add(EMouse::Left, false);
-  MouseMap.Add(EMouse::Right, false);
 
   // Mouse input
   PlayerInputComponent->BindAction(
