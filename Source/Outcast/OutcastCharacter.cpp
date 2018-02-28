@@ -11,7 +11,8 @@ AOutcastCharacter::AOutcastCharacter()
   Jumping(EJump::NONE),
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
-  BunnyHopSpeedRatio(DefaultJumpSpeedRatio)
+  BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
+  Attacking(EAttack::NONE)
 {
  	PrimaryActorTick.bCanEverTick = true;
 
@@ -140,6 +141,7 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
   DOREPLIFETIME_CONDITION(AOutcastCharacter, TorsoRotation, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, CharacterRotation, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, Jumping, COND_SimulatedOnly);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, Attacking, COND_SimulatedOnly);
 }
 
 void AOutcastCharacter::SetSpeed(const float NewSpeed)
@@ -222,6 +224,20 @@ void AOutcastCharacter::Server_SetJumping_Implementation(const EJump NewJumping)
   Jumping = NewJumping;
 }
 bool AOutcastCharacter::Server_SetJumping_Validate(const EJump NewJumping)
+{
+  return true;
+}
+
+void AOutcastCharacter::SetAttack(const EAttack NewAttack)
+{
+  Attacking = NewAttack;
+  Server_SetAttack(Attacking);
+}
+void AOutcastCharacter::Server_SetAttack_Implementation(const EAttack NewAttack)
+{
+  Attacking = NewAttack;
+}
+bool AOutcastCharacter::Server_SetAttack_Validate(const EAttack NewAttack)
 {
   return true;
 }
@@ -464,6 +480,44 @@ void AOutcastCharacter::Jump()
 
 void AOutcastCharacter::Attack()
 {
+  if (Role == ROLE_AutonomousProxy)
+  {
+
+    // Otherwise SimulatedProxies won't know when the attack animation has finished
+    if (Attacking == EAttack::Left)
+    {
+      SetAttack(Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE);
+    }
+    else if (Attacking == EAttack::Right)
+    {
+      SetAttack(Anim->GetIsSlashingRight() ? EAttack::Right : EAttack::NONE);
+    }
+    else if (Attacking == EAttack::Forward)
+    {
+      SetAttack(Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE);
+    }
+
+    if (MouseMap[EMouse::Left] && KeyMap[EKeys::A])
+    {
+      //Anim->SetIsSlashingLeft(true);
+      SetAttack(EAttack::Left);
+    }
+    if (MouseMap[EMouse::Left] && KeyMap[EKeys::D])
+    {
+      //Anim->SetIsSlashingRight(true);
+      SetAttack(EAttack::Right);
+    }
+    if (MouseMap[EMouse::Left] && KeyMap[EKeys::W])
+    {
+      //Anim->SetIsSlashingForward(true);
+      SetAttack(EAttack::Forward);
+    }
+  }
+
+  Anim->SetIsSlashingLeft(Attacking == EAttack::Left);
+  Anim->SetIsSlashingRight(Attacking == EAttack::Right);
+  Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
+
   // Specify the blend weight for sword attacks/basic movement
   if (Anim->GetIsSlashingLeft()
     || Anim->GetIsSlashingRight()
@@ -474,19 +528,6 @@ void AOutcastCharacter::Attack()
   else
   {
     Anim->SubtractAttackMovementBlendWeight(0.1f);
-  }
-
-  if (MouseMap[EMouse::Left] && KeyMap[EKeys::A])
-  {
-    Anim->SetIsSlashingLeft(true);
-  }
-  if (MouseMap[EMouse::Left] && KeyMap[EKeys::D])
-  {
-    Anim->SetIsSlashingRight(true);
-  }
-  if (MouseMap[EMouse::Left] && KeyMap[EKeys::W])
-  {
-    Anim->SetIsSlashingForward(true);
   }
 }
 

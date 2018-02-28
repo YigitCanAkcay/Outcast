@@ -26,6 +26,15 @@ enum class EJump
   BunnyHop
 };
 
+UENUM()
+enum class EAttack
+{
+  NONE,
+  Left,
+  Right,
+  Forward
+};
+
 UCLASS()
 class OUTCAST_API AOutcastCharacter : public ACharacter
 {
@@ -108,6 +117,14 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void SetJumping(const EJump NewJumping);
   //******** BASIC MOVEMENT ********
 
+  //******** ATTACKING ********
+  UPROPERTY(Replicated)
+  EAttack Attacking;
+
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetAttack(const EAttack NewAttack);
+  void SetAttack(const EAttack NewAttack);
+  //******** ATTACKING ********
 
   //******** PLAYER INPUT ********
   enum class EKeys
