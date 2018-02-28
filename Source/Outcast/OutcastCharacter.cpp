@@ -8,6 +8,7 @@ AOutcastCharacter::AOutcastCharacter()
   LegsRotation(FRotator()),
   TorsoRotation(FRotator()),
   CharacterRotation(FRotator()),
+  CharacterLocation(FVector()),
   Jumping(EJump::NONE),
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
@@ -88,7 +89,7 @@ AOutcastCharacter::AOutcastCharacter()
   Movement->AirControl   = 1.0f;
   Movement->MaxWalkSpeed = 1000.0f;
   Movement->MaxFlySpeed  = 10000.0f;
-  Movement->GravityScale = 2.25f;
+  Movement->GravityScale = 5.0f;
 
   bUseControllerRotationYaw   = false;
   bUseControllerRotationPitch = false;
@@ -109,6 +110,7 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
   DOREPLIFETIME_CONDITION(AOutcastCharacter, CharacterRotation, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, Jumping, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, Attacking, COND_SimulatedOnly);
+  DOREPLIFETIME(AOutcastCharacter, CharacterLocation);
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -404,6 +406,15 @@ void AOutcastCharacter::MoveAround()
     {
       AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
     }
+  }
+
+  if (HasAuthority())
+  {
+    CharacterLocation = GetActorLocation();
+  }
+  else
+  {
+    SetActorLocation(CharacterLocation);
   }
 }
 

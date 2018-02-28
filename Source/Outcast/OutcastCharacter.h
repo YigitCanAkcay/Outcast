@@ -78,6 +78,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   FRotator TorsoRotation;
   UPROPERTY(Replicated)
   FRotator CharacterRotation;
+  UPROPERTY(Replicated)
+  FVector CharacterLocation;
 
   UFUNCTION(Server, Reliable, WithValidation)
     void Server_SetSpeed(const float NewSpeed);
