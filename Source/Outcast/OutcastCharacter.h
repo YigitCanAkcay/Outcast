@@ -17,6 +17,15 @@
 
 #include "OutcastCharacter.generated.h"
 
+UENUM()
+enum class EJump
+{
+  NONE,
+  Upwards,
+  Downwards,
+  BunnyHop
+};
+
 UCLASS()
 class OUTCAST_API AOutcastCharacter : public ACharacter
 {
@@ -81,13 +90,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
     void Server_SetCharacterRotation(const FRotator NewCharacterRotation);
   void SetCharacterRotation(const FRotator NewCharacterRotation);
 
-  enum class EJump
-  {
-    NONE,
-    Upwards,
-    Downwards,
-    BunnyHop
-  };
+  UPROPERTY(Replicated)
   EJump Jumping;
   float JumpHeight;
   float JumpStartLocZ;
@@ -98,6 +101,11 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   const float DefaultJumpSpeedRatio     = 120.0f;
   const float BunnyHopMaxHeight         = 100.0f;
   const float BunnyHopFastestSpeedRatio = 20.0f;
+
+
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetJumping(const EJump NewJumping);
+  void SetJumping(const EJump NewJumping);
   //******** BASIC MOVEMENT ********
 
 

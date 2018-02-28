@@ -139,18 +139,17 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
   DOREPLIFETIME_CONDITION(AOutcastCharacter, LegsRotation, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, TorsoRotation, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, CharacterRotation, COND_SimulatedOnly);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, Jumping, COND_SimulatedOnly);
 }
 
 void AOutcastCharacter::SetSpeed(const float NewSpeed)
 {
   Speed = NewSpeed;
-  Anim->SetAcceleration(Speed);
   Server_SetSpeed(NewSpeed);
 }
 void AOutcastCharacter::Server_SetSpeed_Implementation(const float NewSpeed)
 {
   Speed = NewSpeed;
-  Anim->SetAcceleration(Speed);
 }
 bool AOutcastCharacter::Server_SetSpeed_Validate(const float NewSpeed)
 {
@@ -160,13 +159,11 @@ bool AOutcastCharacter::Server_SetSpeed_Validate(const float NewSpeed)
 void AOutcastCharacter::SetWalkPlayrate(const float NewWalkPlayrate)
 {
   WalkPlayrate = NewWalkPlayrate;
-  Anim->SetWalkPlayrate(WalkPlayrate);
   Server_SetWalkPlayrate(NewWalkPlayrate);
 }
 void AOutcastCharacter::Server_SetWalkPlayrate_Implementation(const float NewWalkPlayrate)
 {
   WalkPlayrate = NewWalkPlayrate;
-  Anim->SetWalkPlayrate(WalkPlayrate);
 }
 bool AOutcastCharacter::Server_SetWalkPlayrate_Validate(const float NewWalkPlayrate)
 {
@@ -176,13 +173,11 @@ bool AOutcastCharacter::Server_SetWalkPlayrate_Validate(const float NewWalkPlayr
 void AOutcastCharacter::SetLegsRotation(const FRotator NewLegsRotation)
 {
   LegsRotation = NewLegsRotation;
-  Anim->SetLegsRotation(LegsRotation);
   Server_SetLegsRotation(NewLegsRotation);
 }
 void AOutcastCharacter::Server_SetLegsRotation_Implementation(const FRotator NewLegsRotation)
 {
   LegsRotation = NewLegsRotation;
-  Anim->SetLegsRotation(LegsRotation);
 }
 bool AOutcastCharacter::Server_SetLegsRotation_Validate(const FRotator NewLegsRotation)
 {
@@ -206,13 +201,27 @@ bool AOutcastCharacter::Server_SetTorsoRotation_Validate(const FRotator NewTorso
 void AOutcastCharacter::SetCharacterRotation(const FRotator NewCharacterRotation)
 {
   CharacterRotation = NewCharacterRotation;
-  Server_SetCharacterRotation(NewCharacterRotation);
+  Server_SetCharacterRotation(CharacterRotation);
 }
 void AOutcastCharacter::Server_SetCharacterRotation_Implementation(const FRotator NewCharacterRotation)
 {
   CharacterRotation = NewCharacterRotation;
 }
 bool AOutcastCharacter::Server_SetCharacterRotation_Validate(const FRotator NewCharacterRotation)
+{
+  return true;
+}
+
+void AOutcastCharacter::SetJumping(const EJump NewJumping)
+{
+  Jumping = NewJumping;
+  Server_SetJumping(Jumping);
+}
+void AOutcastCharacter::Server_SetJumping_Implementation(const EJump NewJumping)
+{
+  Jumping = NewJumping;
+}
+bool AOutcastCharacter::Server_SetJumping_Validate(const EJump NewJumping)
 {
   return true;
 }
@@ -312,10 +321,13 @@ void AOutcastCharacter::MoveAround()
     {
       Speed = FMath::Clamp(Speed - 5.0f, MinSpeed, MaxSpeed);
     }
+
+    SetSpeed(Speed);
+    SetWalkPlayrate(WalkPlayrate);
   }
 
-  SetSpeed(Speed);
-  SetWalkPlayrate(WalkPlayrate);
+  Anim->SetAcceleration(Speed);
+  Anim->SetWalkPlayrate(WalkPlayrate);
 
   if (Speed == 0.0f)
   {
@@ -362,9 +374,11 @@ void AOutcastCharacter::MoveAround()
     {
       LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
     }
-  }
 
-  SetLegsRotation(LegsRotation);
+    SetLegsRotation(LegsRotation);
+  }
+  
+  Anim->SetLegsRotation(LegsRotation);
   //**** LEGS ROTATION ****
 
   if (!Direction.IsZero())
@@ -386,29 +400,34 @@ void AOutcastCharacter::MoveAround()
 
 void AOutcastCharacter::Jump()
 {
-  if (KeyMap[EKeys::Space])
+  if (Role == ROLE_AutonomousProxy)
   {
-    if (Jumping != EJump::BunnyHop)
+    if (KeyMap[EKeys::Space])
     {
-      if ( JumpHeight < JumpHeightLimit
-        && Jumping != EJump::Downwards)
+      if (Jumping != EJump::BunnyHop)
       {
-        if (Jumping == EJump::NONE)
+        if (JumpHeight < JumpHeightLimit
+          && Jumping != EJump::Downwards)
         {
-          JumpStartLocZ = GetActorLocation().Z;
+          if (Jumping == EJump::NONE)
+          {
+            JumpStartLocZ = GetActorLocation().Z;
+          }
+          SetJumping(EJump::Upwards);
         }
-        Jumping = EJump::Upwards;
-      }
-      else
-      {
-        Jumping = EJump::Downwards;
+        else
+        {
+          SetJumping(EJump::Downwards);
+        }
       }
     }
+    else if ((Jumping == EJump::Upwards || Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
+    {
+      SetJumping(EJump::Downwards);
+    }
   }
-  else if ((Jumping == EJump::Upwards || Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
-  {
-    Jumping = EJump::Downwards;
-  }
+
+  Anim->SetIsJumping(Jumping != EJump::NONE);
 
   if (Jumping == EJump::Upwards)
   {
@@ -416,8 +435,6 @@ void AOutcastCharacter::Jump()
     Movement->SetMovementMode(MOVE_Flying);
 
     AddMovementInput(GetActorUpVector(), 5.0f);
-
-    Anim->SetIsJumping(true);
   }
   else if (Jumping == EJump::Downwards)
   {
@@ -426,19 +443,21 @@ void AOutcastCharacter::Jump()
   else if (Jumping == EJump::NONE)
   {
     JumpHeight = 0.0f;
-    Anim->SetIsJumping(false);
+    //Movement->SetMovementMode(MOVE_Walking);
   }
   else if (Jumping == EJump::BunnyHop)
   {
-    Anim->SetIsJumping(true);
-
     JumpHeight = GetActorLocation().Z - JumpStartLocZ;
 
     AddMovementInput(GetActorUpVector(), 5.0f);
-    if (JumpHeight > BunnyHopMaxHeight)
+    Movement->SetMovementMode(MOVE_Flying);
+    if (Role == ROLE_AutonomousProxy)
     {
-      Jumping            = EJump::Upwards;
-      BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
+      if (JumpHeight > BunnyHopMaxHeight)
+      {
+        SetJumping(EJump::Upwards);
+        BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
+      }
     }
   }
 }
@@ -667,21 +686,21 @@ void AOutcastCharacter::OnHit(
   // Character is on top of a walkable plane
   if (OtherActor->ActorHasTag(FName("Walkable")))
   {
-    if (KeyMap[EKeys::Space] 
-      && (KeyMap[EKeys::A] || KeyMap[EKeys::D]) 
-      && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
+    if (Role == ROLE_AutonomousProxy)
     {
-      Jumping            = EJump::BunnyHop;
-      JumpHeight         = 0.0f;
-      BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, BunnyHopFastestSpeedRatio, DefaultJumpSpeedRatio);
-      Anim->SetIsJumping(false);
-      Movement->SetMovementMode(MOVE_Flying);
-    }
-    else
-    {
-      Jumping            = EJump::NONE;
-      BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
-      Movement->SetMovementMode(MOVE_Walking);
+      if (KeyMap[EKeys::Space]
+        && (KeyMap[EKeys::A] || KeyMap[EKeys::D])
+        && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
+      {
+        SetJumping(EJump::BunnyHop);
+        JumpHeight = 0.0f;
+        BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, BunnyHopFastestSpeedRatio, DefaultJumpSpeedRatio);
+      }
+      else
+      {
+        SetJumping(EJump::NONE);
+        BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
+      }
     }
   }
 }
