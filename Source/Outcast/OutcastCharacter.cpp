@@ -154,7 +154,10 @@ void AOutcastCharacter::BeginPlay()
 void AOutcastCharacter::SetSpeed(const float NewSpeed)
 {
   Speed = NewSpeed;
-  Server_SetSpeed(NewSpeed);
+  if (!HasAuthority())
+  {
+    Server_SetSpeed(NewSpeed);
+  }
 }
 void AOutcastCharacter::Server_SetSpeed_Implementation(const float NewSpeed)
 {
@@ -168,7 +171,10 @@ bool AOutcastCharacter::Server_SetSpeed_Validate(const float NewSpeed)
 void AOutcastCharacter::SetWalkPlayrate(const float NewWalkPlayrate)
 {
   WalkPlayrate = NewWalkPlayrate;
-  Server_SetWalkPlayrate(NewWalkPlayrate);
+  if (!HasAuthority())
+  {
+    Server_SetWalkPlayrate(NewWalkPlayrate);
+  }
 }
 void AOutcastCharacter::Server_SetWalkPlayrate_Implementation(const float NewWalkPlayrate)
 {
@@ -182,7 +188,10 @@ bool AOutcastCharacter::Server_SetWalkPlayrate_Validate(const float NewWalkPlayr
 void AOutcastCharacter::SetLegsRotation(const FRotator NewLegsRotation)
 {
   LegsRotation = NewLegsRotation;
-  Server_SetLegsRotation(NewLegsRotation);
+  if (!HasAuthority())
+  {
+    Server_SetLegsRotation(NewLegsRotation);
+  }
 }
 void AOutcastCharacter::Server_SetLegsRotation_Implementation(const FRotator NewLegsRotation)
 {
@@ -196,7 +205,10 @@ bool AOutcastCharacter::Server_SetLegsRotation_Validate(const FRotator NewLegsRo
 void AOutcastCharacter::SetTorsoRotation(const FRotator NewTorsoRotation)
 {
   TorsoRotation = NewTorsoRotation;
-  Server_SetTorsoRotation(NewTorsoRotation);
+  if (!HasAuthority())
+  {
+    Server_SetTorsoRotation(NewTorsoRotation);
+  }
 }
 void AOutcastCharacter::Server_SetTorsoRotation_Implementation(const FRotator NewTorsoRotation)
 {
@@ -210,7 +222,10 @@ bool AOutcastCharacter::Server_SetTorsoRotation_Validate(const FRotator NewTorso
 void AOutcastCharacter::SetCharacterRotation(const FRotator NewCharacterRotation)
 {
   CharacterRotation = NewCharacterRotation;
-  Server_SetCharacterRotation(CharacterRotation);
+  if (!HasAuthority())
+  {
+    Server_SetCharacterRotation(CharacterRotation);
+  }
 }
 void AOutcastCharacter::Server_SetCharacterRotation_Implementation(const FRotator NewCharacterRotation)
 {
@@ -224,7 +239,10 @@ bool AOutcastCharacter::Server_SetCharacterRotation_Validate(const FRotator NewC
 void AOutcastCharacter::SetJumping(const EJump NewJumping)
 {
   Jumping = NewJumping;
-  Server_SetJumping(Jumping);
+  if (!HasAuthority())
+  {
+    Server_SetJumping(Jumping);
+  }
 }
 void AOutcastCharacter::Server_SetJumping_Implementation(const EJump NewJumping)
 {
@@ -238,7 +256,10 @@ bool AOutcastCharacter::Server_SetJumping_Validate(const EJump NewJumping)
 void AOutcastCharacter::SetAttack(const EAttack NewAttack)
 {
   Attacking = NewAttack;
-  Server_SetAttack(Attacking);
+  if (!HasAuthority())
+  {
+    Server_SetAttack(Attacking);
+  }
 }
 void AOutcastCharacter::Server_SetAttack_Implementation(const EAttack NewAttack)
 {
