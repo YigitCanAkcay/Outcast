@@ -82,23 +82,23 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   FVector CharacterLocation;
 
   UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetSpeed(const float NewSpeed);
+  void Server_SetSpeed(const float NewSpeed);
   void SetSpeed(const float NewSpeed);
 
   UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetWalkPlayrate(const float NewWalkPlayrate);
+  void Server_SetWalkPlayrate(const float NewWalkPlayrate);
   void SetWalkPlayrate(const float NewWalkPlayrate);
 
   UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetLegsRotation(const FRotator NewLegsRotation);
+  void Server_SetLegsRotation(const FRotator NewLegsRotation);
   void SetLegsRotation(const FRotator NewLegsRotation);
 
   UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetTorsoRotation(const FRotator NewTorsoRotation);
+  void Server_SetTorsoRotation(const FRotator NewTorsoRotation);
   void SetTorsoRotation(const FRotator NewTorsoRotation);
 
   UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetCharacterRotation(const FRotator NewCharacterRotation);
+  void Server_SetCharacterRotation(const FRotator NewCharacterRotation);
   void SetCharacterRotation(const FRotator NewCharacterRotation);
 
   UPROPERTY(Replicated)
@@ -115,7 +115,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
 
   UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetJumping(const EJump NewJumping);
+  void Server_SetJumping(const EJump NewJumping);
   void SetJumping(const EJump NewJumping);
   //******** BASIC MOVEMENT ********
 
@@ -123,8 +123,10 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   UPROPERTY(Replicated)
   EAttack Attacking;
 
+  float LeftMouseTimer;
+
   UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetAttack(const EAttack NewAttack);
+  void Server_SetAttack(const EAttack NewAttack);
   void SetAttack(const EAttack NewAttack);
   //******** ATTACKING ********
 
@@ -183,7 +185,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void LookAround();
   void MoveAround();
   void Jump();
-  void Attack();
+  void Attack(const float DeltaTime);
   //******** TICK FUNCTIONS ********
 
 public:

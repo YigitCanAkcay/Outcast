@@ -13,7 +13,8 @@ AOutcastCharacter::AOutcastCharacter()
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
   BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
-  Attacking(EAttack::NONE)
+  Attacking(EAttack::NONE),
+  LeftMouseTimer(0.0f)
 {
  	PrimaryActorTick.bCanEverTick = true;
 
@@ -302,29 +303,29 @@ void AOutcastCharacter::MoveAround()
     if (KeyMap[EKeys::A])
     {
       FRotator Rot = GetActorRotation();
-      Rot.Yaw = Rot.Yaw - 90.0f;
-      Direction = Direction + Rot.Vector();
+      Rot.Yaw      = Rot.Yaw - 90.0f;
+      Direction    = Direction + Rot.Vector();
     }
 
     if (KeyMap[EKeys::S])
     {
-      Direction = Direction + GetActorRotation().Vector() * -1;
+      Direction    = Direction + GetActorRotation().Vector() * -1;
       WalkPlayrate = -1.0f;
     }
 
     if (KeyMap[EKeys::D])
     {
       FRotator Rot = GetActorRotation();
-      Rot.Yaw = Rot.Yaw + 90.0f;
-      Direction = Direction + Rot.Vector();
+      Rot.Yaw      = Rot.Yaw + 90.0f;
+      Direction    = Direction + Rot.Vector();
     }
     //**** DIRECTION ****
 
     //**** SPEED ****
-    if (KeyMap[EKeys::W]
-      || KeyMap[EKeys::A]
-      || KeyMap[EKeys::S]
-      || KeyMap[EKeys::D])
+    if ( KeyMap[EKeys::W] && !KeyMap[EKeys::S]
+      || KeyMap[EKeys::A] && !KeyMap[EKeys::D]
+      || KeyMap[EKeys::S] && !KeyMap[EKeys::W]
+      || KeyMap[EKeys::D] && !KeyMap[EKeys::A])
     {
       Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
     }
@@ -373,11 +374,11 @@ void AOutcastCharacter::MoveAround()
         LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
       }
     }
-    else if (KeyMap[EKeys::A])
+    else if (KeyMap[EKeys::A] && !KeyMap[EKeys::D])
     {
       LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
     }
-    else if (KeyMap[EKeys::D])
+    else if (KeyMap[EKeys::D] && !KeyMap[EKeys::A])
     {
       LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
     }
@@ -482,11 +483,10 @@ void AOutcastCharacter::Jump()
   }
 }
 
-void AOutcastCharacter::Attack()
+void AOutcastCharacter::Attack(const float DeltaTime)
 {
   if (Role == ROLE_AutonomousProxy)
   {
-
     // Otherwise SimulatedProxies won't know when the attack animation has finished
     if (Attacking == EAttack::Left)
     {
@@ -503,27 +503,39 @@ void AOutcastCharacter::Attack()
 
     if (MouseMap[EMouse::Left])
     {
-      // Slashing left/right has priority over forward
-      if (  KeyMap[EKeys::A]
-        && !KeyMap[EKeys::D])
+      // Disable holding down the left mouse button
+      // Each attack has to be pressed separatly
+      LeftMouseTimer += DeltaTime;
+      if (LeftMouseTimer >= 1.0f)
       {
-        SetAttack(EAttack::Left);
+        MouseMap[EMouse::Left] = false;
+        LeftMouseTimer = 0.0f;
       }
-      else if (!KeyMap[EKeys::A]
-            &&  KeyMap[EKeys::D])
+
+      if (Attacking == EAttack::NONE)
       {
-        SetAttack(EAttack::Right);
-      }
-      else if (!KeyMap[EKeys::A]
-            && !KeyMap[EKeys::D]
-             && KeyMap[EKeys::W])
-      {
-        SetAttack(EAttack::Forward);
-      }
-      else
-      {
-        int Random = FMath::RandRange(1, 3);
-        SetAttack(static_cast<EAttack>(Random));
+        // Slashing left/right has priority over forward
+        if (KeyMap[EKeys::A]
+          && !KeyMap[EKeys::D])
+        {
+          SetAttack(EAttack::Left);
+        }
+        else if (!KeyMap[EKeys::A]
+          && KeyMap[EKeys::D])
+        {
+          SetAttack(EAttack::Right);
+        }
+        else if (!KeyMap[EKeys::A]
+          && !KeyMap[EKeys::D]
+          && KeyMap[EKeys::W])
+        {
+          SetAttack(EAttack::Forward);
+        }
+        else
+        {
+          int Random = FMath::RandRange(1, 3);
+          SetAttack(static_cast<EAttack>(Random));
+        }
       }
     }
   }
@@ -541,7 +553,7 @@ void AOutcastCharacter::Attack()
   }
   else
   {
-    Anim->SubtractAttackMovementBlendWeight(0.1f);
+    Anim->SubtractAttackMovementBlendWeight(0.05f);
   }
 }
 
@@ -555,7 +567,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   Jump();
 
-  Attack();
+  Attack(DeltaTime);
 }
 
 void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -704,6 +716,7 @@ void AOutcastCharacter::SpaceReleased()
 void AOutcastCharacter::MouseLeftPressed()
 {
   MouseMap.Add(EMouse::Left, true);
+  LeftMouseTimer = 0.0f;
 }
 
 void AOutcastCharacter::MouseRightPressed()
