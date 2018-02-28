@@ -29,10 +29,10 @@ enum class EJump
 UENUM()
 enum class EAttack
 {
-  NONE,
-  Left,
-  Right,
-  Forward
+  NONE    = 0,
+  Left    = 1,
+  Right   = 2,
+  Forward = 3
 };
 
 UCLASS()

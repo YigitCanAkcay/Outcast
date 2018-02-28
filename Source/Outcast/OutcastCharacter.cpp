@@ -49,15 +49,6 @@ AOutcastCharacter::AOutcastCharacter()
   {
     Weapon = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Sword")));
     Weapon->SetSkeletalMesh(WeaponMesh.Object);
-
-    if (Body)
-    {
-      const FName SwordSocket = TEXT("Sword");
-      Weapon->AttachToComponent(
-        Body,
-        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
-        SwordSocket);
-    }
   }
 
   static ConstructorHelpers::FObjectFinder<USkeletalMesh> EyeballMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Eyeball.SK_Cat_Eyeball'"));
@@ -68,21 +59,6 @@ AOutcastCharacter::AOutcastCharacter()
 
     Eye_L = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Eye_L")));
     Eye_L->SetSkeletalMesh(EyeballMesh.Object);
-
-    if (Body)
-    {
-      const FName EyeSocket_R = TEXT("Eye_R");
-      const FName EyeSocket_L = TEXT("Eye_L");
-
-      Eye_R->AttachToComponent(
-        Body,
-        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
-        EyeSocket_R);
-      Eye_L->AttachToComponent(
-        Body,
-        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
-        EyeSocket_L);
-    }
   }
 
   static ConstructorHelpers::FObjectFinder<USkeletalMesh> ArmorMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Chest.SK_Cat_Chest'"));
@@ -90,15 +66,6 @@ AOutcastCharacter::AOutcastCharacter()
   {
     Armor = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Armor")));
     Armor->SetSkeletalMesh(ArmorMesh.Object);
-
-    if (Body)
-    {
-      const FName ArmorSocket = TEXT("Chest");
-      Armor->AttachToComponent(
-        Body,
-        FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
-        ArmorSocket);
-    }
   }
 
   Capsule = Cast<UCapsuleComponent>(RootComponent);
@@ -142,6 +109,43 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
   DOREPLIFETIME_CONDITION(AOutcastCharacter, CharacterRotation, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, Jumping, COND_SimulatedOnly);
   DOREPLIFETIME_CONDITION(AOutcastCharacter, Attacking, COND_SimulatedOnly);
+}
+
+void AOutcastCharacter::BeginPlay()
+{
+  Super::BeginPlay();
+
+  Anim = Cast<UOutcastAnimInstance>(Body->GetAnimInstance());
+  if (!Anim)
+  {
+    Destroy();
+  }
+
+  if (Body && Eye_L && Eye_R && Weapon && Armor)
+  {
+    const FName SwordSocket = TEXT("Sword");
+    Weapon->AttachToComponent(
+      Body,
+      FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+      SwordSocket);
+
+    const FName EyeSocket_R = TEXT("Eye_R");
+    const FName EyeSocket_L = TEXT("Eye_L");
+    Eye_R->AttachToComponent(
+      Body,
+      FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+      EyeSocket_R);
+    Eye_L->AttachToComponent(
+      Body,
+      FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+      EyeSocket_L);
+
+    const FName ArmorSocket = TEXT("Chest");
+    Armor->AttachToComponent(
+      Body,
+      FAttachmentTransformRules(EAttachmentRule::SnapToTarget, true),
+      ArmorSocket);
+  }
 }
 
 void AOutcastCharacter::SetSpeed(const float NewSpeed)
@@ -240,17 +244,6 @@ void AOutcastCharacter::Server_SetAttack_Implementation(const EAttack NewAttack)
 bool AOutcastCharacter::Server_SetAttack_Validate(const EAttack NewAttack)
 {
   return true;
-}
-
-void AOutcastCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-
-  Anim = Cast<UOutcastAnimInstance>(Body->GetAnimInstance());
-  if (!Anim)
-  {
-    Destroy();
-  }
 }
 
 void AOutcastCharacter::LookAround()
@@ -497,20 +490,30 @@ void AOutcastCharacter::Attack()
       SetAttack(Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE);
     }
 
-    if (MouseMap[EMouse::Left] && KeyMap[EKeys::A])
+    if (MouseMap[EMouse::Left])
     {
-      //Anim->SetIsSlashingLeft(true);
-      SetAttack(EAttack::Left);
-    }
-    if (MouseMap[EMouse::Left] && KeyMap[EKeys::D])
-    {
-      //Anim->SetIsSlashingRight(true);
-      SetAttack(EAttack::Right);
-    }
-    if (MouseMap[EMouse::Left] && KeyMap[EKeys::W])
-    {
-      //Anim->SetIsSlashingForward(true);
-      SetAttack(EAttack::Forward);
+      // Slashing left/right has priority over forward
+      if (  KeyMap[EKeys::A]
+        && !KeyMap[EKeys::D])
+      {
+        SetAttack(EAttack::Left);
+      }
+      else if (!KeyMap[EKeys::A]
+            &&  KeyMap[EKeys::D])
+      {
+        SetAttack(EAttack::Right);
+      }
+      else if (!KeyMap[EKeys::A]
+            && !KeyMap[EKeys::D]
+             && KeyMap[EKeys::W])
+      {
+        SetAttack(EAttack::Forward);
+      }
+      else
+      {
+        int Random = FMath::RandRange(1, 3);
+        SetAttack(static_cast<EAttack>(Random));
+      }
     }
   }
 
