@@ -6,6 +6,8 @@ AOutcastCharacter::AOutcastCharacter()
   Direction(FVector()),
   WalkPlayrate(1.0f),
   LegsRotation(FRotator()),
+  TorsoRotation(FRotator()),
+  CharacterRotation(FRotator()),
   Jumping(EJump::NONE),
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
@@ -123,6 +125,96 @@ AOutcastCharacter::AOutcastCharacter()
   bUseControllerRotationYaw   = false;
   bUseControllerRotationPitch = false;
   bUseControllerRotationRoll  = false;
+
+  // Server related
+  bReplicates        = true;
+  bReplicateMovement = true;
+}
+
+void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, Speed, COND_SimulatedOnly);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, WalkPlayrate, COND_SimulatedOnly);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, LegsRotation, COND_SimulatedOnly);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, TorsoRotation, COND_SimulatedOnly);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, CharacterRotation, COND_SimulatedOnly);
+}
+
+void AOutcastCharacter::SetSpeed(const float NewSpeed)
+{
+  Speed = NewSpeed;
+  Anim->SetAcceleration(Speed);
+  Server_SetSpeed(NewSpeed);
+}
+void AOutcastCharacter::Server_SetSpeed_Implementation(const float NewSpeed)
+{
+  Speed = NewSpeed;
+  Anim->SetAcceleration(Speed);
+}
+bool AOutcastCharacter::Server_SetSpeed_Validate(const float NewSpeed)
+{
+  return true;
+}
+
+void AOutcastCharacter::SetWalkPlayrate(const float NewWalkPlayrate)
+{
+  WalkPlayrate = NewWalkPlayrate;
+  Anim->SetWalkPlayrate(WalkPlayrate);
+  Server_SetWalkPlayrate(NewWalkPlayrate);
+}
+void AOutcastCharacter::Server_SetWalkPlayrate_Implementation(const float NewWalkPlayrate)
+{
+  WalkPlayrate = NewWalkPlayrate;
+  Anim->SetWalkPlayrate(WalkPlayrate);
+}
+bool AOutcastCharacter::Server_SetWalkPlayrate_Validate(const float NewWalkPlayrate)
+{
+  return true;
+}
+
+void AOutcastCharacter::SetLegsRotation(const FRotator NewLegsRotation)
+{
+  LegsRotation = NewLegsRotation;
+  Anim->SetLegsRotation(LegsRotation);
+  Server_SetLegsRotation(NewLegsRotation);
+}
+void AOutcastCharacter::Server_SetLegsRotation_Implementation(const FRotator NewLegsRotation)
+{
+  LegsRotation = NewLegsRotation;
+  Anim->SetLegsRotation(LegsRotation);
+}
+bool AOutcastCharacter::Server_SetLegsRotation_Validate(const FRotator NewLegsRotation)
+{
+  return true;
+}
+
+void AOutcastCharacter::SetTorsoRotation(const FRotator NewTorsoRotation)
+{
+  TorsoRotation = NewTorsoRotation;
+  Server_SetTorsoRotation(NewTorsoRotation);
+}
+void AOutcastCharacter::Server_SetTorsoRotation_Implementation(const FRotator NewTorsoRotation)
+{
+  TorsoRotation = NewTorsoRotation;
+}
+bool AOutcastCharacter::Server_SetTorsoRotation_Validate(const FRotator NewTorsoRotation)
+{
+  return true;
+}
+
+void AOutcastCharacter::SetCharacterRotation(const FRotator NewCharacterRotation)
+{
+  CharacterRotation = NewCharacterRotation;
+  Server_SetCharacterRotation(NewCharacterRotation);
+}
+void AOutcastCharacter::Server_SetCharacterRotation_Implementation(const FRotator NewCharacterRotation)
+{
+  CharacterRotation = NewCharacterRotation;
+}
+bool AOutcastCharacter::Server_SetCharacterRotation_Validate(const FRotator NewCharacterRotation)
+{
+  return true;
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -134,99 +226,97 @@ void AOutcastCharacter::BeginPlay()
   {
     Destroy();
   }
-
-  // Server related
-  if (HasAuthority())
-  {
-    SetReplicates(true);
-    SetReplicateMovement(true);
-  }
 }
 
-void AOutcastCharacter::Tick(float DeltaTime)
+void AOutcastCharacter::LookAround()
 {
-  Super::Tick(DeltaTime);
-
-  //******** LOOK AROUND ********
-  
-  // Rotate whole Character
-  FRotator NewRotation = GetActorRotation();
-  NewRotation.Yaw      = NewRotation.Yaw + MouseInput.X;
-  SetActorRotation(NewRotation);
-
-  // Rotate the torso of the character
-  FRotator NewTorsoRotation = Anim->GetTorsoRotation();
-  NewTorsoRotation.Roll     = FMath::Clamp(NewTorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
-  Anim->SetTorsoRotation(NewTorsoRotation);
-
-  // Rotate the camera
-  FRotator NewCameraRot = Camera->GetComponentRotation();
-  NewCameraRot.Pitch    = NewCameraRot.Pitch + MouseInput.Y;
-
-  if (NewCameraRot.Pitch >= -80.0f
-    && NewCameraRot.Pitch <= 80.0f)
+  if (Role == ROLE_AutonomousProxy)
   {
-    Camera->SetWorldRotation(NewCameraRot);
+    // Rotate whole Character
+    CharacterRotation = GetActorRotation();
+    CharacterRotation.Yaw = CharacterRotation.Yaw + MouseInput.X;
+    SetCharacterRotation(CharacterRotation);
 
-    FVector NewCameraLoc = Camera->RelativeLocation;
-    const float NewRadius = NewCameraLoc.Size();
-    const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
+    // Rotate the torso of the character
+    TorsoRotation = Anim->GetTorsoRotation();
+    TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
+    SetTorsoRotation(TorsoRotation);
 
-    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
-    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
+    // Rotate the camera
+    FRotator NewCameraRot = Camera->GetComponentRotation();
+    NewCameraRot.Pitch = NewCameraRot.Pitch + MouseInput.Y;
 
-    Camera->SetRelativeLocation(NewCameraLoc);
+    if (NewCameraRot.Pitch >= -80.0f
+      && NewCameraRot.Pitch <= 80.0f)
+    {
+      Camera->SetWorldRotation(NewCameraRot);
+
+      FVector NewCameraLoc = Camera->RelativeLocation;
+      const float NewRadius = NewCameraLoc.Size();
+      const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
+
+      NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
+      NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
+
+      Camera->SetRelativeLocation(NewCameraLoc);
+    }
   }
 
-  //******** LOOK AROUND ********
+  Anim->SetTorsoRotation(TorsoRotation);
+  SetActorRotation(CharacterRotation);
+}
 
-
-  //******** MOVE AROUND ********
-  Direction    = FVector(0.0f, 0.0f, 0.0f);
-  WalkPlayrate = 1.0f;
-
-  //**** DIRECTION ****
-  if (KeyMap[EKeys::W])
+void AOutcastCharacter::MoveAround()
+{
+  if (Role == ROLE_AutonomousProxy)
   {
-    Direction = Direction + GetActorRotation().Vector();
+    Direction = FVector(0.0f, 0.0f, 0.0f);
+    WalkPlayrate = 1.0f;
+
+    //**** DIRECTION ****
+    if (KeyMap[EKeys::W])
+    {
+      Direction = Direction + GetActorRotation().Vector();
+    }
+
+    if (KeyMap[EKeys::A])
+    {
+      FRotator Rot = GetActorRotation();
+      Rot.Yaw = Rot.Yaw - 90.0f;
+      Direction = Direction + Rot.Vector();
+    }
+
+    if (KeyMap[EKeys::S])
+    {
+      Direction = Direction + GetActorRotation().Vector() * -1;
+      WalkPlayrate = -1.0f;
+    }
+
+    if (KeyMap[EKeys::D])
+    {
+      FRotator Rot = GetActorRotation();
+      Rot.Yaw = Rot.Yaw + 90.0f;
+      Direction = Direction + Rot.Vector();
+    }
+    //**** DIRECTION ****
+
+    //**** SPEED ****
+    if (KeyMap[EKeys::W]
+      || KeyMap[EKeys::A]
+      || KeyMap[EKeys::S]
+      || KeyMap[EKeys::D])
+    {
+      Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
+    }
+    else
+    {
+      Speed = FMath::Clamp(Speed - 5.0f, MinSpeed, MaxSpeed);
+    }
   }
 
-  if (KeyMap[EKeys::A])
-  {
-    FRotator Rot = GetActorRotation();
-    Rot.Yaw      = Rot.Yaw - 90.0f;
-    Direction    = Direction + Rot.Vector();
-  }
+  SetSpeed(Speed);
+  SetWalkPlayrate(WalkPlayrate);
 
-  if (KeyMap[EKeys::S])
-  {
-    Direction    = Direction + GetActorRotation().Vector() * -1;
-    WalkPlayrate = -1.0f;
-  }
-
-  if (KeyMap[EKeys::D])
-  {
-    FRotator Rot = GetActorRotation();
-    Rot.Yaw      = Rot.Yaw + 90.0f;
-    Direction    = Direction + Rot.Vector();
-  }
-  //**** DIRECTION ****
-
-  //**** SPEED ****
-  if ( KeyMap[EKeys::W]
-    || KeyMap[EKeys::A]
-    || KeyMap[EKeys::S]
-    || KeyMap[EKeys::D])
-  {
-    Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
-  }
-  else
-  {
-    Speed = FMath::Clamp(Speed - 5.0f, MinSpeed, MaxSpeed);
-  }
-
-  Anim->SetAcceleration(Speed);
-  Anim->SetWalkPlayrate(WalkPlayrate);
   if (Speed == 0.0f)
   {
     Direction = GetActorRotation().Vector();
@@ -234,44 +324,47 @@ void AOutcastCharacter::Tick(float DeltaTime)
   //**** SPEED ****
 
   //**** LEGS ROTATION ****
-  if (KeyMap[EKeys::W])
+  if (Role == ROLE_AutonomousProxy)
   {
-    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-    if (KeyMap[EKeys::A])
+    if (KeyMap[EKeys::W])
     {
-      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+      LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+      if (KeyMap[EKeys::A])
+      {
+        LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+      }
+      else if (KeyMap[EKeys::D])
+      {
+        LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+      }
+    }
+    else if (KeyMap[EKeys::S])
+    {
+      LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+      if (KeyMap[EKeys::A])
+      {
+        LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+      }
+      else if (KeyMap[EKeys::D])
+      {
+        LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+      }
+    }
+    else if (KeyMap[EKeys::A])
+    {
+      LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
     }
     else if (KeyMap[EKeys::D])
     {
-      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+      LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
     }
-  }
-  else if (KeyMap[EKeys::S])
-  {
-    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-    if (KeyMap[EKeys::A])
+    else
     {
-      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+      LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
     }
-    else if (KeyMap[EKeys::D])
-    {
-      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
-    }
-  }
-  else if (KeyMap[EKeys::A])
-  {
-    LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
-  }
-  else if (KeyMap[EKeys::D])
-  {
-    LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
-  }
-  else
-  {
-    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
   }
 
-  Anim->SetLegsRotation(LegsRotation);
+  SetLegsRotation(LegsRotation);
   //**** LEGS ROTATION ****
 
   if (!Direction.IsZero())
@@ -289,11 +382,10 @@ void AOutcastCharacter::Tick(float DeltaTime)
       AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
     }
   }
+}
 
-  //******** MOVE AROUND ********
-
-
-  //******** JUMP ********
+void AOutcastCharacter::Jump()
+{
   if (KeyMap[EKeys::Space])
   {
     if (Jumping != EJump::BunnyHop)
@@ -317,7 +409,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
   {
     Jumping = EJump::Downwards;
   }
- 
+
   if (Jumping == EJump::Upwards)
   {
     JumpHeight = GetActorLocation().Z - JumpStartLocZ;
@@ -349,9 +441,10 @@ void AOutcastCharacter::Tick(float DeltaTime)
       BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
   }
-  //******** JUMP ********
+}
 
-  //******** ATTACK ********
+void AOutcastCharacter::Attack()
+{
   // Specify the blend weight for sword attacks/basic movement
   if (Anim->GetIsSlashingLeft()
     || Anim->GetIsSlashingRight()
@@ -363,7 +456,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
   {
     Anim->SubtractAttackMovementBlendWeight(0.1f);
   }
-  
+
   if (MouseMap[EMouse::Left] && KeyMap[EKeys::A])
   {
     Anim->SetIsSlashingLeft(true);
@@ -376,7 +469,19 @@ void AOutcastCharacter::Tick(float DeltaTime)
   {
     Anim->SetIsSlashingForward(true);
   }
-  //******** ATTACK ********
+}
+
+void AOutcastCharacter::Tick(float DeltaTime)
+{
+  Super::Tick(DeltaTime);
+
+  LookAround();
+
+  MoveAround();
+
+  Jump();
+
+  Attack();
 }
 
 void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

@@ -21,6 +21,7 @@ void UOutcastAnimInstance::SetIsRunning(const bool bNewIsRunning)
 {
   bIsRunning = bNewIsRunning;
 }
+
 bool UOutcastAnimInstance::GetIsRunning() const
 {
   return bIsRunning;
@@ -35,6 +36,7 @@ void UOutcastAnimInstance::SetIsJumping(const bool bNewIsJumping)
 {
   bIsJumping = bNewIsJumping;
 }
+
 bool UOutcastAnimInstance::GetIsJumping() const
 {
   return bIsJumping;
@@ -54,6 +56,7 @@ void UOutcastAnimInstance::SetAttackMovementBlendWeight(const float NewAttackMov
 {
   AttackMovementBlendWeight = NewAttackMovementBlendWeight;
 }
+
 float UOutcastAnimInstance::GetAttackMovementBlendWeight() const
 {
   return AttackMovementBlendWeight;
@@ -63,6 +66,7 @@ void UOutcastAnimInstance::SetIsSlashingLeft(const bool bNewIsSlashingLeft)
 {
   bIsSlashingLeft = bNewIsSlashingLeft;
 }
+
 bool UOutcastAnimInstance::GetIsSlashingLeft() const
 {
   return bIsSlashingLeft;
@@ -72,6 +76,7 @@ void UOutcastAnimInstance::SetIsSlashingRight(const bool bNewIsSlashingRight)
 {
   bIsSlashingRight = bNewIsSlashingRight;
 }
+
 bool UOutcastAnimInstance::GetIsSlashingRight() const
 {
   return bIsSlashingRight;
@@ -81,6 +86,7 @@ void UOutcastAnimInstance::SetIsSlashingForward(const bool bNewIsSlashingForward
 {
   bIsSlashingForward = bNewIsSlashingForward;
 }
+
 bool UOutcastAnimInstance::GetIsSlashingForward() const
 {
   return bIsSlashingForward;
@@ -95,6 +101,7 @@ void UOutcastAnimInstance::SetTorsoRotation(const FRotator& NewTorsoRotation)
 {
   TorsoRotation = NewTorsoRotation;
 }
+
 
 FRotator UOutcastAnimInstance::GetTorsoRotation() const
 {

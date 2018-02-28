@@ -51,6 +51,7 @@ public:
 
   void AddAttackMovementBlendWeight(const float DeltaAttackMovementBlendWeight);
   void SubtractAttackMovementBlendWeight(const float DeltaAttackMovementBlendWeight);
+
   void SetAttackMovementBlendWeight(const float NewAttackMovementBlendWeight);
   float GetAttackMovementBlendWeight() const;
 

@@ -11,6 +11,7 @@
 #include "Runtime/Engine/Classes/GameFramework/CharacterMovementComponent.h"
 #include "Runtime/Engine/Classes/Animation/SkeletalMeshActor.h"
 #include "Runtime/Engine/Classes/Engine/SkeletalMeshSocket.h"
+#include "Net/UnrealNetwork.h"
 
 #include "OutcastAnimInstance.h"
 
@@ -46,12 +47,39 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ANIMATION ********
 
   //******** BASIC MOVEMENT ********
+  UPROPERTY(Replicated)
   float Speed;
   const float MaxSpeed = 100.0f;
   const float MinSpeed = 0.0f;
   FVector Direction;
+  UPROPERTY(Replicated)
   float WalkPlayrate;
+  UPROPERTY(Replicated)
   FRotator LegsRotation;
+  UPROPERTY(Replicated)
+  FRotator TorsoRotation;
+  UPROPERTY(Replicated)
+  FRotator CharacterRotation;
+
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetSpeed(const float NewSpeed);
+  void SetSpeed(const float NewSpeed);
+
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetWalkPlayrate(const float NewWalkPlayrate);
+  void SetWalkPlayrate(const float NewWalkPlayrate);
+
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetLegsRotation(const FRotator NewLegsRotation);
+  void SetLegsRotation(const FRotator NewLegsRotation);
+
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetTorsoRotation(const FRotator NewTorsoRotation);
+  void SetTorsoRotation(const FRotator NewTorsoRotation);
+
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetCharacterRotation(const FRotator NewCharacterRotation);
+  void SetCharacterRotation(const FRotator NewCharacterRotation);
 
   enum class EJump
   {
@@ -124,8 +152,17 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
     const FHitResult& Hit);
   //******** COLLISION ********
 
+  //******** TICK FUNCTIONS ********
+  void LookAround();
+  void MoveAround();
+  void Jump();
+  void Attack();
+  //******** TICK FUNCTIONS ********
+
 public:
 	AOutcastCharacter();
+
+  void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
 	virtual void BeginPlay() override;
