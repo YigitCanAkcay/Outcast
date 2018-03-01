@@ -294,11 +294,6 @@ bool AOutcastCharacter::Server_SetHealth_Validate(const int NewHealth)
   return true;
 }
 
-void AOutcastCharacter::SetHUD(UUserWidget* NewHUD)
-{
-  HUD = NewHUD;
-}
-
 int AOutcastCharacter::GetHealth()
 {
   return Health;
@@ -311,7 +306,30 @@ void AOutcastCharacter::BodyOverlapBegin(
   int32 OtherBodyIndex,
   bool bFromSweep,
   const FHitResult& SweepResult)
-{}
+{
+  if (Role == ROLE_AutonomousProxy)
+  {
+    // Other Actor is the actor that triggered the event. Check that is not ourself.  
+    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
+    {
+      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+
+      if (!DamageTakenBy.Contains(AttackingCharacter))
+      {
+        DamageTakenBy.Add(AttackingCharacter, 0.0f);
+
+        if (AttackingCharacter->GetAttack() == EAttack::NONE)
+        {
+          SetHealth(FMath::Clamp(Health - 1, 0, 100));
+        }
+        else
+        {
+          SetHealth(FMath::Clamp(Health - 20, 0, 100));
+        }
+      }
+    }
+  }
+}
 
 void AOutcastCharacter::BodyOverlapEnd(
   UPrimitiveComponent* OverlappedComp,
@@ -324,7 +342,12 @@ void AOutcastCharacter::BodyOverlapEnd(
     // Other Actor is the actor that triggered the event. Check that is not ourself.  
     if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
     {
-      SetHealth(FMath::Clamp(Health - 20, 0, 100));
+      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+
+      if (DamageTakenBy.Contains(AttackingCharacter))
+      {
+        DamageTakenBy.Remove(AttackingCharacter);
+      }
     }
   }
 }
@@ -659,11 +682,35 @@ void AOutcastCharacter::Tick(float DeltaTime)
   Attack(DeltaTime);
 
   Alive(DeltaTime);
+
+  for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
+  {
+    AttackerIt->Value = AttackerIt->Value + DeltaTime;
+
+    if (AttackerIt->Value >= 1.0f)
+    {
+      AttackerIt->Value = 0.0f;
+
+      if (AttackerIt->Key->GetAttack() == EAttack::NONE)
+      {
+        SetHealth(FMath::Clamp(Health - 1, 0, 100));
+      }
+      else
+      {
+        SetHealth(FMath::Clamp(Health - 20, 0, 100));
+      }
+    }
+  }
 }
 
 void AOutcastCharacter::SetMyPlayerController(APlayerController* const NewPlayerController)
 {
   MyPlayerController = NewPlayerController;
+}
+
+EAttack AOutcastCharacter::GetAttack()
+{
+  return Attacking;
 }
 
 void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

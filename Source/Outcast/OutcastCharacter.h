@@ -125,11 +125,10 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ATTACKING ********
   float LeftMouseTimer;
 
-  UUserWidget* HUD;
-  UFUNCTION(BlueprintCallable)
-  void SetHUD(UUserWidget* NewHUD);
   UFUNCTION(BlueprintCallable)
   int GetHealth();
+
+  TMap<AOutcastCharacter*, float> DamageTakenBy;
 
   UPROPERTY(Replicated)
   EAttack Attacking;
@@ -232,6 +231,8 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
   void SetMyPlayerController(APlayerController* const NewPlayerController);
+
+  EAttack GetAttack();
 
 	virtual void SetupPlayerInputComponent(
     class UInputComponent* PlayerInputComponent) override;
