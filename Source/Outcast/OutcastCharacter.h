@@ -36,6 +36,31 @@ enum class EAttack
   Forward = 3
 };
 
+USTRUCT()
+struct FReplicatedData
+{
+  GENERATED_BODY()
+
+  UPROPERTY()
+  float Speed;
+  UPROPERTY()
+  float WalkPlayrate;
+  UPROPERTY()
+  FRotator LegsRotation;
+  UPROPERTY()
+  FRotator TorsoRotation;
+  UPROPERTY()
+  FRotator CharacterRotation;
+  UPROPERTY()
+  EJump Jumping;
+  UPROPERTY()
+  EAttack Attacking;
+  UPROPERTY()
+  FVector CharacterLocation;
+  UPROPERTY()
+  int Health;
+};
+
 UCLASS()
 class OUTCAST_API AOutcastCharacter : public ACharacter
 {
@@ -67,44 +92,34 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   UOutcastAnimInstance* Anim;
   //******** ANIMATION ********
 
-  //******** BASIC MOVEMENT ********
+  //******** REPLICATION ********
   UPROPERTY(Replicated)
+  FReplicatedData ReplicatedData;
+  void ExtractReplicatedData();
+  void FillReplicatedData();
+
+  UFUNCTION(Server, Reliable, WithValidation)
+  void Server_SetReplicatedData(const FReplicatedData NewReplicatedData);
+  void SetReplicatedData(const FReplicatedData NewReplicatedData);
+  //******** REPLICATION ********
+
+  //******** BASIC MOVEMENT ********
   float Speed;
   const float MaxSpeed = 100.0f;
   const float MinSpeed = 0.0f;
   FVector Direction;
-  UPROPERTY(Replicated)
   float WalkPlayrate;
-  UPROPERTY(Replicated)
   FRotator LegsRotation;
-  UPROPERTY(Replicated)
   FRotator TorsoRotation;
-  UPROPERTY(Replicated)
   FRotator CharacterRotation;
-  UPROPERTY(Replicated)
   FVector CharacterLocation;
 
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetSpeed(const float NewSpeed);
   void SetSpeed(const float NewSpeed);
-
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetWalkPlayrate(const float NewWalkPlayrate);
   void SetWalkPlayrate(const float NewWalkPlayrate);
-
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetLegsRotation(const FRotator NewLegsRotation);
   void SetLegsRotation(const FRotator NewLegsRotation);
-
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetTorsoRotation(const FRotator NewTorsoRotation);
   void SetTorsoRotation(const FRotator NewTorsoRotation);
-
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetCharacterRotation(const FRotator NewCharacterRotation);
   void SetCharacterRotation(const FRotator NewCharacterRotation);
 
-  UPROPERTY(Replicated)
   EJump Jumping;
   float JumpHeight;
   float JumpStartLocZ;
@@ -116,9 +131,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   const float BunnyHopMaxHeight         = 100.0f;
   const float BunnyHopFastestSpeedRatio = 20.0f;
 
-
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetJumping(const EJump NewJumping);
   void SetJumping(const EJump NewJumping);
   //******** BASIC MOVEMENT ********
 
@@ -130,18 +142,10 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   TMap<AOutcastCharacter*, float> DamageTakenBy;
 
-  UPROPERTY(Replicated)
   EAttack Attacking;
-  UPROPERTY(Replicated)
   int Health;
-  // Temporary:
-  int LastHealth;
 
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetAttack(const EAttack NewAttack);
   void SetAttack(const EAttack NewAttack);
-  UFUNCTION(Server, Reliable, WithValidation)
-    void Server_SetHealth(const int NewHealth);
   void SetHealth(const int NewHealth);
 
   UFUNCTION()

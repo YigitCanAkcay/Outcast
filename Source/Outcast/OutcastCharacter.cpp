@@ -19,7 +19,6 @@ AOutcastCharacter::AOutcastCharacter()
   BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
   Attacking(EAttack::NONE),
   Health(100),
-  LastHealth(100),
   LeftMouseTimer(0.0f),
   MouseInput(FVector2D::ZeroVector)
 {
@@ -87,7 +86,6 @@ AOutcastCharacter::AOutcastCharacter()
   Capsule->OnComponentBeginOverlap.AddDynamic(this, &AOutcastCharacter::BodyOverlapBegin);
   Capsule->OnComponentEndOverlap.AddDynamic(this, &AOutcastCharacter::BodyOverlapEnd);
   
-
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
   Camera->SetupAttachment(RootComponent);
   Camera->SetRelativeLocation(FVector(-423.0f, 0.0f, 200.0f));
@@ -110,20 +108,15 @@ AOutcastCharacter::AOutcastCharacter()
 void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-  DOREPLIFETIME(AOutcastCharacter, Speed);
-  DOREPLIFETIME(AOutcastCharacter, WalkPlayrate);
-  DOREPLIFETIME(AOutcastCharacter, LegsRotation);
-  DOREPLIFETIME(AOutcastCharacter, TorsoRotation);
-  DOREPLIFETIME(AOutcastCharacter, CharacterRotation);
-  DOREPLIFETIME(AOutcastCharacter, Jumping);
-  DOREPLIFETIME(AOutcastCharacter, Attacking);
-  DOREPLIFETIME(AOutcastCharacter, CharacterLocation);
-  DOREPLIFETIME(AOutcastCharacter, Health);
+
+  DOREPLIFETIME(AOutcastCharacter, ReplicatedData);
 }
 
 void AOutcastCharacter::BeginPlay()
 {
   Super::BeginPlay();
+
+  FillReplicatedData();
 
   Anim = Cast<UOutcastAnimInstance>(Body->GetAnimInstance());
   if (!Anim)
@@ -158,140 +151,95 @@ void AOutcastCharacter::BeginPlay()
   }
 }
 
+void AOutcastCharacter::ExtractReplicatedData()
+{
+  Speed             = ReplicatedData.Speed;
+  WalkPlayrate      = ReplicatedData.WalkPlayrate;
+  LegsRotation      = ReplicatedData.LegsRotation;
+  TorsoRotation     = ReplicatedData.TorsoRotation;
+  CharacterRotation = ReplicatedData.CharacterRotation;
+  Jumping           = ReplicatedData.Jumping;
+  Attacking         = ReplicatedData.Attacking;
+  CharacterLocation = ReplicatedData.CharacterLocation;
+  Health            = ReplicatedData.Health;
+}
+
+void AOutcastCharacter::FillReplicatedData()
+{
+  ReplicatedData.Speed             = Speed;
+  ReplicatedData.WalkPlayrate      = WalkPlayrate;
+  ReplicatedData.LegsRotation      = LegsRotation;
+  ReplicatedData.TorsoRotation     = TorsoRotation;
+  ReplicatedData.CharacterRotation = CharacterRotation;
+  ReplicatedData.Jumping           = Jumping;
+  ReplicatedData.Attacking         = Attacking;
+  ReplicatedData.CharacterLocation = CharacterLocation;
+  ReplicatedData.Health            = Health;
+}
+
+void AOutcastCharacter::SetReplicatedData(const FReplicatedData NewReplicatedData)
+{
+  ReplicatedData = NewReplicatedData;
+  if (!HasAuthority())
+  {
+    Server_SetReplicatedData(NewReplicatedData);
+  }
+}
+void AOutcastCharacter::Server_SetReplicatedData_Implementation(const FReplicatedData NewReplicatedData)
+{
+  ReplicatedData = NewReplicatedData;
+}
+bool AOutcastCharacter::Server_SetReplicatedData_Validate(const FReplicatedData NewReplicatedData)
+{
+  return true;
+}
+
 void AOutcastCharacter::SetSpeed(const float NewSpeed)
 {
   Speed = NewSpeed;
-  if (!HasAuthority())
-  {
-    Server_SetSpeed(NewSpeed);
-  }
-}
-void AOutcastCharacter::Server_SetSpeed_Implementation(const float NewSpeed)
-{
-  Speed = NewSpeed;
-}
-bool AOutcastCharacter::Server_SetSpeed_Validate(const float NewSpeed)
-{
-  return true;
+  ReplicatedData.Speed = Speed;
 }
 
 void AOutcastCharacter::SetWalkPlayrate(const float NewWalkPlayrate)
 {
   WalkPlayrate = NewWalkPlayrate;
-  if (!HasAuthority())
-  {
-    Server_SetWalkPlayrate(NewWalkPlayrate);
-  }
-}
-void AOutcastCharacter::Server_SetWalkPlayrate_Implementation(const float NewWalkPlayrate)
-{
-  WalkPlayrate = NewWalkPlayrate;
-}
-bool AOutcastCharacter::Server_SetWalkPlayrate_Validate(const float NewWalkPlayrate)
-{
-  return true;
+  ReplicatedData.WalkPlayrate = WalkPlayrate;
 }
 
 void AOutcastCharacter::SetLegsRotation(const FRotator NewLegsRotation)
 {
   LegsRotation = NewLegsRotation;
-  if (!HasAuthority())
-  {
-    Server_SetLegsRotation(NewLegsRotation);
-  }
-}
-void AOutcastCharacter::Server_SetLegsRotation_Implementation(const FRotator NewLegsRotation)
-{
-  LegsRotation = NewLegsRotation;
-}
-bool AOutcastCharacter::Server_SetLegsRotation_Validate(const FRotator NewLegsRotation)
-{
-  return true;
+  ReplicatedData.LegsRotation = LegsRotation;
 }
 
 void AOutcastCharacter::SetTorsoRotation(const FRotator NewTorsoRotation)
 {
   TorsoRotation = NewTorsoRotation;
-  if (!HasAuthority())
-  {
-    Server_SetTorsoRotation(NewTorsoRotation);
-  }
-}
-void AOutcastCharacter::Server_SetTorsoRotation_Implementation(const FRotator NewTorsoRotation)
-{
-  TorsoRotation = NewTorsoRotation;
-}
-bool AOutcastCharacter::Server_SetTorsoRotation_Validate(const FRotator NewTorsoRotation)
-{
-  return true;
+  ReplicatedData.TorsoRotation = TorsoRotation;
 }
 
 void AOutcastCharacter::SetCharacterRotation(const FRotator NewCharacterRotation)
 {
   CharacterRotation = NewCharacterRotation;
-  if (!HasAuthority())
-  {
-    Server_SetCharacterRotation(CharacterRotation);
-  }
-}
-void AOutcastCharacter::Server_SetCharacterRotation_Implementation(const FRotator NewCharacterRotation)
-{
-  CharacterRotation = NewCharacterRotation;
-}
-bool AOutcastCharacter::Server_SetCharacterRotation_Validate(const FRotator NewCharacterRotation)
-{
-  return true;
+  ReplicatedData.CharacterRotation = CharacterRotation;
 }
 
 void AOutcastCharacter::SetJumping(const EJump NewJumping)
 {
   Jumping = NewJumping;
-  if (!HasAuthority())
-  {
-    Server_SetJumping(Jumping);
-  }
-}
-void AOutcastCharacter::Server_SetJumping_Implementation(const EJump NewJumping)
-{
-  Jumping = NewJumping;
-}
-bool AOutcastCharacter::Server_SetJumping_Validate(const EJump NewJumping)
-{
-  return true;
+  ReplicatedData.Jumping = Jumping;
 }
 
 void AOutcastCharacter::SetAttack(const EAttack NewAttack)
 {
   Attacking = NewAttack;
-  if (!HasAuthority())
-  {
-    Server_SetAttack(Attacking);
-  }
-}
-void AOutcastCharacter::Server_SetAttack_Implementation(const EAttack NewAttack)
-{
-  Attacking = NewAttack;
-}
-bool AOutcastCharacter::Server_SetAttack_Validate(const EAttack NewAttack)
-{
-  return true;
+  ReplicatedData.Attacking = Attacking;
 }
 
 void AOutcastCharacter::SetHealth(const int NewHealth)
 {
   Health = NewHealth;
-  if (!HasAuthority())
-  {
-    Server_SetHealth(Health);
-  }
-}
-void AOutcastCharacter::Server_SetHealth_Implementation(const int NewHealth)
-{
-  Health = NewHealth;
-}
-bool AOutcastCharacter::Server_SetHealth_Validate(const int NewHealth)
-{
-  return true;
+  ReplicatedData.Health = Health;
 }
 
 int AOutcastCharacter::GetHealth()
@@ -514,7 +462,7 @@ void AOutcastCharacter::MoveAround()
 
   if (HasAuthority())
   {
-    CharacterLocation = GetActorLocation();
+    ReplicatedData.CharacterLocation = GetActorLocation();
   }
   else
   {
@@ -673,6 +621,8 @@ void AOutcastCharacter::Tick(float DeltaTime)
 {
   Super::Tick(DeltaTime);
 
+  ExtractReplicatedData();
+
   LookAround();
 
   MoveAround();
@@ -683,23 +633,31 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   Alive(DeltaTime);
 
-  for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
+  if (Role == ROLE_AutonomousProxy)
   {
-    AttackerIt->Value = AttackerIt->Value + DeltaTime;
-
-    if (AttackerIt->Value >= 1.0f)
+    for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
     {
-      AttackerIt->Value = 0.0f;
+      AttackerIt->Value = AttackerIt->Value + DeltaTime;
 
-      if (AttackerIt->Key->GetAttack() == EAttack::NONE)
+      if (AttackerIt->Value >= 1.0f)
       {
-        SetHealth(FMath::Clamp(Health - 1, 0, 100));
-      }
-      else
-      {
-        SetHealth(FMath::Clamp(Health - 20, 0, 100));
+        AttackerIt->Value = 0.0f;
+
+        if (AttackerIt->Key->GetAttack() == EAttack::NONE)
+        {
+          SetHealth(FMath::Clamp(Health - 1, 0, 100));
+        }
+        else
+        {
+          SetHealth(FMath::Clamp(Health - 20, 0, 100));
+        }
       }
     }
+  }
+
+  if (Role == ROLE_AutonomousProxy)
+  {
+    SetReplicatedData(ReplicatedData);
   }
 }
 
