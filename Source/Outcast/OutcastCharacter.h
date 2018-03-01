@@ -12,6 +12,7 @@
 #include "Runtime/Engine/Classes/Animation/SkeletalMeshActor.h"
 #include "Runtime/Engine/Classes/Engine/SkeletalMeshSocket.h"
 #include "Net/UnrealNetwork.h"
+#include "Blueprint/UserWidget.h"
 
 #include "OutcastAnimInstance.h"
 
@@ -59,6 +60,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   UCharacterMovementComponent* Movement;
   //******** COMPONENTS ********
+
+  APlayerController* MyPlayerController;
 
   //******** ANIMATION ********
   UOutcastAnimInstance* Anim;
@@ -122,14 +125,25 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ATTACKING ********
   float LeftMouseTimer;
 
+  UUserWidget* HUD;
+  UFUNCTION(BlueprintCallable)
+  void SetHUD(UUserWidget* NewHUD);
+  UFUNCTION(BlueprintCallable)
+  int GetHealth();
+
   UPROPERTY(Replicated)
   EAttack Attacking;
   UPROPERTY(Replicated)
   int Health;
+  // Temporary:
+  int LastHealth;
 
   UFUNCTION(Server, Reliable, WithValidation)
   void Server_SetAttack(const EAttack NewAttack);
   void SetAttack(const EAttack NewAttack);
+  UFUNCTION(Server, Reliable, WithValidation)
+    void Server_SetHealth(const int NewHealth);
+  void SetHealth(const int NewHealth);
 
   UFUNCTION()
   void BodyOverlapBegin(
@@ -139,6 +153,12 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
     int32 OtherBodyIndex, 
     bool bFromSweep, 
     const FHitResult& SweepResult);
+  UFUNCTION()
+  void BodyOverlapEnd(
+    UPrimitiveComponent* OverlappedComp,
+    AActor* OtherActor,
+    UPrimitiveComponent* OtherComp,
+    int32 OtherBodyIndex);
   //******** ATTACKING ********
 
   //******** PLAYER INPUT ********
@@ -210,6 +230,8 @@ protected:
 
 public:	
 	virtual void Tick(float DeltaTime) override;
+
+  void SetMyPlayerController(APlayerController* const NewPlayerController);
 
 	virtual void SetupPlayerInputComponent(
     class UInputComponent* PlayerInputComponent) override;

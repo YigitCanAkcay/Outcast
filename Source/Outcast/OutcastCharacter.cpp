@@ -1,4 +1,5 @@
 #include "OutcastCharacter.h"
+#include "OutcastGameMode.h"
 
 #define COL_Player ECC_GameTraceChannel1
 #define COL_Weapon ECC_GameTraceChannel2
@@ -18,7 +19,9 @@ AOutcastCharacter::AOutcastCharacter()
   BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
   Attacking(EAttack::NONE),
   Health(100),
-  LeftMouseTimer(0.0f)
+  LastHealth(100),
+  LeftMouseTimer(0.0f),
+  MouseInput(FVector2D::ZeroVector)
 {
  	PrimaryActorTick.bCanEverTick = true;
 
@@ -30,7 +33,6 @@ AOutcastCharacter::AOutcastCharacter()
   KeyMap.Add(EKeys::Space, false);
 
   // Initialize Mouse Input
-  MouseInput = FVector2D::ZeroVector;
   MouseMap.Add(EMouse::Left, false);
   MouseMap.Add(EMouse::Right, false);
 
@@ -83,6 +85,7 @@ AOutcastCharacter::AOutcastCharacter()
   Capsule->SetCollisionProfileName(TEXT("Player"));
   Capsule->OnComponentHit.__Internal_AddDynamic(this, &AOutcastCharacter::OnHit, FName("OnHit"));
   Capsule->OnComponentBeginOverlap.AddDynamic(this, &AOutcastCharacter::BodyOverlapBegin);
+  Capsule->OnComponentEndOverlap.AddDynamic(this, &AOutcastCharacter::BodyOverlapEnd);
   
 
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -274,6 +277,33 @@ bool AOutcastCharacter::Server_SetAttack_Validate(const EAttack NewAttack)
   return true;
 }
 
+void AOutcastCharacter::SetHealth(const int NewHealth)
+{
+  Health = NewHealth;
+  if (!HasAuthority())
+  {
+    Server_SetHealth(Health);
+  }
+}
+void AOutcastCharacter::Server_SetHealth_Implementation(const int NewHealth)
+{
+  Health = NewHealth;
+}
+bool AOutcastCharacter::Server_SetHealth_Validate(const int NewHealth)
+{
+  return true;
+}
+
+void AOutcastCharacter::SetHUD(UUserWidget* NewHUD)
+{
+  HUD = NewHUD;
+}
+
+int AOutcastCharacter::GetHealth()
+{
+  return Health;
+}
+
 void AOutcastCharacter::BodyOverlapBegin(
   UPrimitiveComponent* OverlappedComp,
   AActor* OtherActor,
@@ -281,13 +311,20 @@ void AOutcastCharacter::BodyOverlapBegin(
   int32 OtherBodyIndex,
   bool bFromSweep,
   const FHitResult& SweepResult)
+{}
+
+void AOutcastCharacter::BodyOverlapEnd(
+  UPrimitiveComponent* OverlappedComp,
+  AActor* OtherActor,
+  UPrimitiveComponent* OtherComp,
+  int32 OtherBodyIndex)
 {
-  if (HasAuthority())
+  if (Role == ROLE_AutonomousProxy)
   {
     // Other Actor is the actor that triggered the event. Check that is not ourself.  
     if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
     {
-      Health = FMath::Clamp(Health - 20, 0, 100);
+      SetHealth(FMath::Clamp(Health - 20, 0, 100));
     }
   }
 }
@@ -588,9 +625,7 @@ void AOutcastCharacter::Attack(const float DeltaTime)
   Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
 
   // Specify the blend weight for sword attacks/basic movement
-  if (Anim->GetIsSlashingLeft()
-    || Anim->GetIsSlashingRight()
-    || Anim->GetIsSlashingForward())
+  if (Attacking != EAttack::NONE)
   {
     Anim->AddAttackMovementBlendWeight(0.1f);
   }
@@ -602,9 +637,12 @@ void AOutcastCharacter::Attack(const float DeltaTime)
 
 void AOutcastCharacter::Alive(const float DeltaTime)
 {
-  if (GEngine)
+  if (HasAuthority())
   {
-    GEngine->AddOnScreenDebugMessage(-1, 0.1f, FColor::Red, *FString::Printf(TEXT("%d"), Health));
+    if (Health == 0)
+    {
+      Cast<AOutcastGameMode>(GetWorld()->GetAuthGameMode())->Respawn(MyPlayerController);
+    }
   }
 }
 
@@ -621,6 +659,11 @@ void AOutcastCharacter::Tick(float DeltaTime)
   Attack(DeltaTime);
 
   Alive(DeltaTime);
+}
+
+void AOutcastCharacter::SetMyPlayerController(APlayerController* const NewPlayerController)
+{
+  MyPlayerController = NewPlayerController;
 }
 
 void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
