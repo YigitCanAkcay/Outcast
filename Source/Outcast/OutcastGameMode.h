@@ -19,6 +19,8 @@ public:
   void PostLogin(APlayerController* NewPlayer) override;
   void Logout(AController* Player) override;
 
+  void Respawn(APlayerController* Player);
+
 private:
   TArray<APlayerController*> PlayerList;
 	
