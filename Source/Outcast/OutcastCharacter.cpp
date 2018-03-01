@@ -1,5 +1,8 @@
 #include "OutcastCharacter.h"
 
+#define COL_Player ECC_GameTraceChannel1
+#define COL_Weapon ECC_GameTraceChannel2
+
 AOutcastCharacter::AOutcastCharacter()
   :
   Speed(0.0f),
@@ -14,6 +17,7 @@ AOutcastCharacter::AOutcastCharacter()
   JumpStartLocZ(0.0f),
   BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
   Attacking(EAttack::NONE),
+  Health(100),
   LeftMouseTimer(0.0f)
 {
  	PrimaryActorTick.bCanEverTick = true;
@@ -46,11 +50,13 @@ AOutcastCharacter::AOutcastCharacter()
     Body->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
   }
 
-  static ConstructorHelpers::FObjectFinder<USkeletalMesh> WeaponMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Sword.SK_Cat_Sword'"));
+   ConstructorHelpers::FObjectFinder<UStaticMesh> WeaponMesh(TEXT("StaticMesh'/Game/Meshes/Weapon_StaticMesh.Weapon_StaticMesh'"));
   if (WeaponMesh.Succeeded())
   {
-    Weapon = NewObject<USkeletalMeshComponent>(this, USkeletalMeshComponent::StaticClass(), FName(TEXT("Sword")));
-    Weapon->SetSkeletalMesh(WeaponMesh.Object);
+    Weapon = NewObject<UStaticMeshComponent>(this, UStaticMeshComponent::StaticClass(), FName(TEXT("Sword")));
+    Weapon->SetStaticMesh(WeaponMesh.Object);
+
+    Weapon->SetCollisionProfileName(TEXT("Weapon"));
   }
 
   static ConstructorHelpers::FObjectFinder<USkeletalMesh> EyeballMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Eyeball.SK_Cat_Eyeball'"));
@@ -71,18 +77,16 @@ AOutcastCharacter::AOutcastCharacter()
   }
 
   Capsule = Cast<UCapsuleComponent>(RootComponent);
-  if (Capsule)
-  {
-    Capsule->SetCapsuleHalfHeight(120.0f);
-    Capsule->SetCapsuleRadius(60.0f);
-
-    Capsule->SetRelativeLocation(FVector(0.0f, 0.0f, 122.0f));
-    Capsule->OnComponentHit.__Internal_AddDynamic(this, &AOutcastCharacter::OnHit, FName("OnHit"));
-  }
+  Capsule->SetCapsuleHalfHeight(120.0f);
+  Capsule->SetCapsuleRadius(60.0f);
+  Capsule->SetRelativeLocation(FVector(0.0f, 0.0f, 122.0f));
+  Capsule->SetCollisionProfileName(TEXT("Player"));
+  Capsule->OnComponentHit.__Internal_AddDynamic(this, &AOutcastCharacter::OnHit, FName("OnHit"));
+  Capsule->OnComponentBeginOverlap.AddDynamic(this, &AOutcastCharacter::BodyOverlapBegin);
+  
 
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
   Camera->SetupAttachment(RootComponent);
-
   Camera->SetRelativeLocation(FVector(-423.0f, 0.0f, 200.0f));
   Camera->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
 
@@ -96,7 +100,6 @@ AOutcastCharacter::AOutcastCharacter()
   bUseControllerRotationPitch = false;
   bUseControllerRotationRoll  = false;
 
-  // Server related
   bReplicates        = true;
   bReplicateMovement = true;
 }
@@ -104,14 +107,15 @@ AOutcastCharacter::AOutcastCharacter()
 void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, Speed, COND_SimulatedOnly);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, WalkPlayrate, COND_SimulatedOnly);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, LegsRotation, COND_SimulatedOnly);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, TorsoRotation, COND_SimulatedOnly);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, CharacterRotation, COND_SimulatedOnly);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, Jumping, COND_SimulatedOnly);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, Attacking, COND_SimulatedOnly);
+  DOREPLIFETIME(AOutcastCharacter, Speed);
+  DOREPLIFETIME(AOutcastCharacter, WalkPlayrate);
+  DOREPLIFETIME(AOutcastCharacter, LegsRotation);
+  DOREPLIFETIME(AOutcastCharacter, TorsoRotation);
+  DOREPLIFETIME(AOutcastCharacter, CharacterRotation);
+  DOREPLIFETIME(AOutcastCharacter, Jumping);
+  DOREPLIFETIME(AOutcastCharacter, Attacking);
   DOREPLIFETIME(AOutcastCharacter, CharacterLocation);
+  DOREPLIFETIME(AOutcastCharacter, Health);
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -268,6 +272,24 @@ void AOutcastCharacter::Server_SetAttack_Implementation(const EAttack NewAttack)
 bool AOutcastCharacter::Server_SetAttack_Validate(const EAttack NewAttack)
 {
   return true;
+}
+
+void AOutcastCharacter::BodyOverlapBegin(
+  UPrimitiveComponent* OverlappedComp,
+  AActor* OtherActor,
+  UPrimitiveComponent* OtherComp,
+  int32 OtherBodyIndex,
+  bool bFromSweep,
+  const FHitResult& SweepResult)
+{
+  if (HasAuthority())
+  {
+    // Other Actor is the actor that triggered the event. Check that is not ourself.  
+    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
+    {
+      Health = FMath::Clamp(Health - 20, 0, 100);
+    }
+  }
 }
 
 void AOutcastCharacter::LookAround()
@@ -578,6 +600,14 @@ void AOutcastCharacter::Attack(const float DeltaTime)
   }
 }
 
+void AOutcastCharacter::Alive(const float DeltaTime)
+{
+  if (GEngine)
+  {
+    GEngine->AddOnScreenDebugMessage(-1, 0.1f, FColor::Red, *FString::Printf(TEXT("%d"), Health));
+  }
+}
+
 void AOutcastCharacter::Tick(float DeltaTime)
 {
   Super::Tick(DeltaTime);
@@ -589,6 +619,8 @@ void AOutcastCharacter::Tick(float DeltaTime)
   Jump();
 
   Attack(DeltaTime);
+
+  Alive(DeltaTime);
 }
 
 void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

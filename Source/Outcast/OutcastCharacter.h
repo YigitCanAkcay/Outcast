@@ -43,8 +43,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COMPONENTS ********
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
     USkeletalMeshComponent* Body;
-  UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
-    USkeletalMeshComponent* Weapon;
+  UPROPERTY(VisibleAnywhere, Category = StaticMesh)
+    UStaticMeshComponent* Weapon;
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
     USkeletalMeshComponent* Eye_R;
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
@@ -120,14 +120,25 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** BASIC MOVEMENT ********
 
   //******** ATTACKING ********
+  float LeftMouseTimer;
+
   UPROPERTY(Replicated)
   EAttack Attacking;
-
-  float LeftMouseTimer;
+  UPROPERTY(Replicated)
+  int Health;
 
   UFUNCTION(Server, Reliable, WithValidation)
   void Server_SetAttack(const EAttack NewAttack);
   void SetAttack(const EAttack NewAttack);
+
+  UFUNCTION()
+  void BodyOverlapBegin(
+    UPrimitiveComponent* OverlappedComp, 
+    AActor* OtherActor, 
+    UPrimitiveComponent* OtherComp, 
+    int32 OtherBodyIndex, 
+    bool bFromSweep, 
+    const FHitResult& SweepResult);
   //******** ATTACKING ********
 
   //******** PLAYER INPUT ********
@@ -186,6 +197,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void MoveAround();
   void Jump();
   void Attack(const float DeltaTime);
+  void Alive(const float DeltaTime);
   //******** TICK FUNCTIONS ********
 
 public:
