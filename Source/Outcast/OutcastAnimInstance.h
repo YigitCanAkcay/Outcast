@@ -10,20 +10,22 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
 {
   GENERATED_UCLASS_BODY()
 
+  AActor* MyActor;
+
   //******** BASIC MOVEMENT ********
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    bool bIsJumping;
+  bool bIsJumping;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    bool bIsRunning;
+  bool bIsRunning;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    float Speed;  
+  float Speed;  
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    float PlayRate;
+  float PlayRate;
 
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    FRotator TorsoRotation;
+  FRotator TorsoRotation;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    FRotator LegsRotation;
+  FRotator LegsRotation;
 
   TArray<FRotator> LegsRotationBuffer;
   int CurrentLegsRotationBufferIndex;
@@ -31,16 +33,20 @@ class OUTCAST_API UOutcastAnimInstance : public UAnimInstance
 
   //******** ATTACKING ********
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    float AttackMovementBlendWeight;
+  float AttackMovementBlendWeight;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    bool bIsSlashingLeft;
+  bool bIsSlashingLeft;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    bool bIsSlashingRight;
+  bool bIsSlashingRight;
   UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = BasicMovement)
-    bool bIsSlashingForward;
+  bool bIsSlashingForward;
   //******** ATTACKING ********
 
 public:
+  void SetMyActor(AActor* const NewActor);
+  UFUNCTION(BlueprintCallable)
+  AActor* GetMyActor();
+
   void SetIsRunning(const bool bNewIsRunning);
   bool GetIsRunning() const;
 

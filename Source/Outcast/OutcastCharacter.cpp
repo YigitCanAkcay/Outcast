@@ -102,13 +102,99 @@ AOutcastCharacter::AOutcastCharacter()
 
   bReplicates        = true;
   bReplicateMovement = true;
-
+  
   // Sounds
-  static ConstructorHelpers::FObjectFinder<USoundWave> Hit(TEXT("SoundWave'/Game/Audio/Hit.Hit'"));
-  if (Hit.Succeeded())
+  static ConstructorHelpers::FObjectFinder<USoundAttenuation> Atten(TEXT("SoundAttenuation'/Game/Audio/Distance.Distance'"));
+  if (Atten.Succeeded())
   {
-    UE_LOG(LogTemp, Warning, TEXT("FOUND!"));
-    HitSound = Hit.Object;
+    Attenuation = Atten.Object;
+  }
+
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step1(TEXT("SoundWave'/Game/Audio/Walk/Step1.Step1'"));
+  if (Step1.Succeeded())
+  {
+    StepSounds.Add(Step1.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step2(TEXT("SoundWave'/Game/Audio/Walk/Step2.Step2'"));
+  if (Step2.Succeeded())
+  {
+    StepSounds.Add(Step2.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step3(TEXT("SoundWave'/Game/Audio/Walk/Step3.Step3'"));
+  if (Step3.Succeeded())
+  {
+    StepSounds.Add(Step3.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step4(TEXT("SoundWave'/Game/Audio/Walk/Step4.Step4'"));
+  if (Step4.Succeeded())
+  {
+    StepSounds.Add(Step4.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step5(TEXT("SoundWave'/Game/Audio/Walk/Step5.Step5'"));
+  if (Step5.Succeeded())
+  {
+    StepSounds.Add(Step5.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step6(TEXT("SoundWave'/Game/Audio/Walk/Step6.Step6'"));
+  if (Step6.Succeeded())
+  {
+    StepSounds.Add(Step6.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step7(TEXT("SoundWave'/Game/Audio/Walk/Step7.Step7'"));
+  if (Step7.Succeeded())
+  {
+    StepSounds.Add(Step7.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> Step8(TEXT("SoundWave'/Game/Audio/Walk/Step8.Step8'"));
+  if (Step8.Succeeded())
+  {
+    StepSounds.Add(Step8.Object);
+  }
+
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal1(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump1.Jump1'"));
+  if (JumpVocal1.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal1.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal2(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump2.Jump2'"));
+  if (JumpVocal2.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal2.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal3(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump3.Jump3'"));
+  if (JumpVocal3.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal3.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal4(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump4.Jump4'"));
+  if (JumpVocal4.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal4.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal5(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump5.Jump5'"));
+  if (JumpVocal5.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal5.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal6(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump6.Jump6'"));
+  if (JumpVocal6.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal6.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal7(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump7.Jump7'"));
+  if (JumpVocal7.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal7.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal8(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump8.Jump8'"));
+  if (JumpVocal8.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal8.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> JumpVocal9(TEXT("SoundWave'/Game/Audio/Jump/Vocals/Jump9.Jump9'"));
+  if (JumpVocal9.Succeeded())
+  {
+    JumpVocalSounds.Add(JumpVocal9.Object);
   }
 }
 
@@ -128,10 +214,7 @@ void AOutcastCharacter::BeginPlay()
   {
     Destroy();
   }
-
-  //FillReplicatedData();
-  //ReplicatedData.CharacterLocation = GetActorLocation();
-  //ReplicatedData.CharacterRotation = ReturnFVector(GetActorRotation());
+  Anim->SetMyActor(this);
 
   if (Body && Eye_L && Eye_R && Weapon && Armor)
   {
@@ -208,6 +291,38 @@ void AOutcastCharacter::CreateState()
   CurrentState.AnimData.Attacking     = Attacking;
 }
 
+void AOutcastCharacter::OnRep_LastMove()
+{
+  CleanMoveList();
+  ReplayMoves();
+}
+
+void AOutcastCharacter::CleanMoveList()
+{}
+
+void AOutcastCharacter::ReplayMoves()
+{}
+
+void AOutcastCharacter::AddCurrentMove()
+{
+  TArray<bool> KeyArray;
+  TArray<bool> MouseArray;
+  KeyMap.GenerateValueArray(KeyArray);
+  MouseMap.GenerateValueArray(MouseArray);
+  if (KeyArray.Contains(true)
+    || MouseArray.Contains(true)
+    || MouseInput.X != 0
+    || MouseInput.Y != 0)
+  {
+    FMove CurrentMove;
+    CurrentMove.KeyMap     = KeyMap;
+    CurrentMove.MouseMap   = MouseMap;
+    CurrentMove.MouseInput = MouseInput;
+    CurrentMove.Time       = FDateTime::Now();
+    MoveList.Add(CurrentMove);
+  }
+}
+
 FVector AOutcastCharacter::ReturnFVector(const FRotator& Rotator)
 {
   FVector Vector;
@@ -228,6 +343,18 @@ FRotator AOutcastCharacter::ReturnFRotator(const FVector& Vector)
 int AOutcastCharacter::GetHealth()
 {
   return Health;
+}
+
+void AOutcastCharacter::PlayStepSound()
+{
+  int Random = FMath::RandRange(0, 7);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), StepSounds[Random], GetActorLocation(), 0.5f, 1.0f, 0.0f, Attenuation);
+}
+
+void AOutcastCharacter::PlayJumpVocalSound()
+{
+  int Random = FMath::RandRange(0, 8);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), JumpVocalSounds[Random], GetActorLocation(), 0.1f, 1.0f, 0.0f, Attenuation);
 }
 
 void AOutcastCharacter::BodyOverlapBegin(
@@ -256,11 +383,10 @@ void AOutcastCharacter::BodyOverlapBegin(
         Health = FMath::Clamp(Health - 20, 0, 100);
       }
 
-      if (HitSound)
+      /*if (HitSound && Attenuation)
       {
-        UE_LOG(LogTemp, Warning, TEXT("OKAY!"));
-        UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSound, GetActorLocation(), 1.0f, 1.0f, 0.0f);
-      }
+        UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSound, GetActorLocation(), 1.0f, 1.0f, 0.0f, Attenuation);
+      }*/
     }
   }
 }
@@ -461,6 +587,27 @@ void AOutcastCharacter::Jump()
 
   Anim->SetIsJumping(Jumping != EJump::NONE);
 
+  if (HasAuthority())
+  {
+    FString TheJump;
+    switch (Jumping)
+    {
+    case EJump::NONE:
+      TheJump = FString("NONE");
+      break;
+     case EJump::Upwards:
+       TheJump = FString("Upwards");
+       break;
+     case EJump::Downwards:
+       TheJump = FString("Downwards");
+       break;
+     case EJump::BunnyHop:
+       TheJump = FString("BunnyHop");
+       break;
+    }
+    UE_LOG(LogTemp, Warning, TEXT("%s %s"), *GetName(), *TheJump);
+  }
+
   if (Jumping == EJump::Upwards)
   {
     JumpHeight = GetActorLocation().Z - JumpStartLocZ;
@@ -577,11 +724,6 @@ void AOutcastCharacter::TakeConsecutiveDamage(const float DeltaTime)
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
       }
-
-      if (HitSound)
-      {
-        //UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSound, GetActorLocation(), 1.0f, 1.0f, 0.0f);
-      }
     }
   }
 }
@@ -606,7 +748,7 @@ void AOutcastCharacter::Tick(float DeltaTime)
   }
   else if (IsLocallyControlled())
   {
-
+    AddCurrentMove();
   }
 }
 
@@ -860,6 +1002,10 @@ void AOutcastCharacter::OnHit(
   // Character is on top of a walkable plane
   if (OtherActor->ActorHasTag(FName("Walkable")))
   {
+    if (IsLocallyControlled())
+    {
+      UE_LOG(LogTemp, Warning, TEXT("HIT!"));
+    }
     if (KeyMap[EKey::Space]
       && (KeyMap[EKey::A] || KeyMap[EKey::D])
       && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
@@ -867,11 +1013,16 @@ void AOutcastCharacter::OnHit(
       Jumping = EJump::BunnyHop;
       JumpHeight = 0.0f;
       BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, BunnyHopFastestSpeedRatio, DefaultJumpSpeedRatio);
+
+      PlayJumpVocalSound();
     }
     else
     {
       Jumping = EJump::NONE;
       BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
+
+    PlayStepSound();
+    Anim->SetIsJumping(false);
   }
 }

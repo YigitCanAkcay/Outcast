@@ -14,6 +14,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
+#include "Runtime/Core/Public/Misc/DateTime.h"
 
 #include "OutcastAnimInstance.h"
 
@@ -96,9 +97,24 @@ struct FState
 
   UPROPERTY()
   FReplicatedAnimData AnimData;
+};
+
+USTRUCT()
+struct FMove
+{
+  GENERATED_BODY()
 
   UPROPERTY()
-  float Time;
+  TMap<EKey, bool> KeyMap;
+
+  UPROPERTY()
+  TMap<EMouse, bool> MouseMap;
+
+  UPROPERTY()
+  FVector2D MouseInput;
+
+  UPROPERTY()
+  FDateTime Time;
 };
 
 UCLASS()
@@ -127,7 +143,15 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COMPONENTS ********
 
   //******** ASSETS ********
-  USoundWave* HitSound;
+  TArray<USoundWave*> StepSounds;
+  TArray<USoundWave*> JumpVocalSounds;
+
+  UFUNCTION(BlueprintCallable)
+  void PlayStepSound();
+  UFUNCTION(BlueprintCallable)
+  void PlayJumpVocalSound();
+
+  USoundAttenuation* Attenuation;
   //******** ASSETS ********
 
   APlayerController* MyPlayerController;
@@ -143,6 +167,15 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   UFUNCTION()
   void OnRep_ApplyState();
   void CreateState();
+
+  UPROPERTY(ReplicatedUsing = OnRep_LastMove)
+  FMove LastMove;
+  UFUNCTION()
+  void OnRep_LastMove();
+  TArray<FMove> MoveList;
+  void CleanMoveList();
+  void ReplayMoves();
+  void AddCurrentMove();
   //******** REPLICATION ********
 
   //******** HELPERS ********

@@ -17,6 +17,16 @@ UOutcastAnimInstance::UOutcastAnimInstance(const FObjectInitializer& ObjectIniti
 {
 }
 
+void UOutcastAnimInstance::SetMyActor(AActor* const NewActor)
+{
+  MyActor = NewActor;
+}
+
+AActor* UOutcastAnimInstance::GetMyActor()
+{
+  return MyActor;
+}
+
 void UOutcastAnimInstance::SetIsRunning(const bool bNewIsRunning)
 {
   bIsRunning = bNewIsRunning;
