@@ -108,8 +108,7 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-  DOREPLIFETIME(AOutcastCharacter, ReplicatedData);
-  DOREPLIFETIME(AOutcastCharacter, ReplicatedAnimData);
+  DOREPLIFETIME(AOutcastCharacter, CurrentState);
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -153,66 +152,52 @@ void AOutcastCharacter::BeginPlay()
   }
 }
 
-void AOutcastCharacter::ExtractReplicatedData()
+void AOutcastCharacter::ExtractState()
 {
-  Jumping           = ReplicatedData.Jumping;
-  CharacterLocation = ReplicatedData.CharacterLocation;
-  CharacterRotation = ReturnFRotator(ReplicatedData.CharacterRotation);
-  Health            = ReplicatedData.Health;
+  Jumping           = CurrentState.Data.Jumping;
+  CharacterLocation = CurrentState.Data.CharacterLocation;
+  CharacterRotation = ReturnFRotator(CurrentState.Data.CharacterRotation);
+  Health            = CurrentState.Data.Health;
+
+  Speed         = CurrentState.AnimData.Speed;
+  WalkPlayrate  = CurrentState.AnimData.WalkPlayrate;
+  LegsRotation  = ReturnFRotator(CurrentState.AnimData.LegsRotation);
+  TorsoRotation = ReturnFRotator(CurrentState.AnimData.TorsoRotation);
+  Attacking     = CurrentState.AnimData.Attacking;
 }
 
-void AOutcastCharacter::ApplyReplicatedData()
+void AOutcastCharacter::OnRep_ApplyState()
 {
-  ExtractReplicatedData();
+  ExtractState();
+
+  SetActorRotation(CharacterRotation);
+  SetActorLocation(CharacterLocation);
 
   if (Anim)
   {
     Anim->SetIsJumping(Jumping != EJump::NONE);
-  }
-  SetActorRotation(CharacterRotation);
-  SetActorLocation(CharacterLocation);
-}
-
-void AOutcastCharacter::FillReplicatedData()
-{
-  ReplicatedData.Jumping           = Jumping;
-  ReplicatedData.CharacterLocation = CharacterLocation;
-  ReplicatedData.CharacterRotation = ReturnFVector(CharacterRotation);
-  ReplicatedData.Health            = Health;
-}
-
-void AOutcastCharacter::ExtractReplicatedAnimData()
-{
-  Speed         = ReplicatedAnimData.Speed;
-  WalkPlayrate  = ReplicatedAnimData.WalkPlayrate;
-  LegsRotation  = ReturnFRotator(ReplicatedAnimData.LegsRotation);
-  TorsoRotation = ReturnFRotator(ReplicatedAnimData.TorsoRotation);
-  Attacking     = ReplicatedAnimData.Attacking;
-}
-
-void AOutcastCharacter::ApplyReplicatedAnimData()
-{
-  ExtractReplicatedAnimData();
-
-  if (Anim)
-  {
-  Anim->SetAcceleration(Speed);
-  Anim->SetWalkPlayrate(WalkPlayrate);
-  Anim->SetLegsRotation(LegsRotation);
-  Anim->SetTorsoRotation(TorsoRotation);
-  Anim->SetIsSlashingLeft(Attacking == EAttack::Left);
-  Anim->SetIsSlashingRight(Attacking == EAttack::Right);
-  Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
+    Anim->SetAcceleration(Speed);
+    Anim->SetWalkPlayrate(WalkPlayrate);
+    Anim->SetLegsRotation(LegsRotation);
+    Anim->SetTorsoRotation(TorsoRotation);
+    Anim->SetIsSlashingLeft(Attacking == EAttack::Left);
+    Anim->SetIsSlashingRight(Attacking == EAttack::Right);
+    Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
   }
 }
 
-void AOutcastCharacter::FillReplicatedAnimData()
+void AOutcastCharacter::CreateState()
 {
-  ReplicatedAnimData.Speed         = Speed;
-  ReplicatedAnimData.WalkPlayrate  = WalkPlayrate;
-  ReplicatedAnimData.LegsRotation  = ReturnFVector(LegsRotation);
-  ReplicatedAnimData.TorsoRotation = ReturnFVector(TorsoRotation);
-  ReplicatedAnimData.Attacking     = Attacking;
+  CurrentState.Data.Jumping           = Jumping;
+  CurrentState.Data.CharacterLocation = CharacterLocation;
+  CurrentState.Data.CharacterRotation = ReturnFVector(CharacterRotation);
+  CurrentState.Data.Health            = Health;
+
+  CurrentState.AnimData.Speed         = Speed;
+  CurrentState.AnimData.WalkPlayrate  = WalkPlayrate;
+  CurrentState.AnimData.LegsRotation  = ReturnFVector(LegsRotation);
+  CurrentState.AnimData.TorsoRotation = ReturnFVector(TorsoRotation);
+  CurrentState.AnimData.Attacking     = Attacking;
 }
 
 FVector AOutcastCharacter::ReturnFVector(const FRotator& Rotator)
@@ -227,8 +212,8 @@ FRotator AOutcastCharacter::ReturnFRotator(const FVector& Vector)
 {
   FRotator Rotator;
   Rotator.Pitch = Vector.X;
-  Rotator.Roll = Vector.Y;
-  Rotator.Yaw = Vector.Z;
+  Rotator.Roll  = Vector.Y;
+  Rotator.Yaw   = Vector.Z;
   return Rotator;
 }
 
@@ -598,8 +583,11 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   if (HasAuthority())
   {
-    FillReplicatedData();
-    FillReplicatedAnimData();
+    CreateState();
+  }
+  else if (IsLocallyControlled())
+  {
+
   }
 }
 

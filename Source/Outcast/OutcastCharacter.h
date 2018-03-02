@@ -85,6 +85,21 @@ struct FReplicatedAnimData
   EAttack Attacking;
 };
 
+USTRUCT()
+struct FState
+{
+  GENERATED_BODY()
+
+  UPROPERTY()
+  FReplicatedData Data;
+
+  UPROPERTY()
+  FReplicatedAnimData AnimData;
+
+  UPROPERTY()
+  float Time;
+};
+
 UCLASS()
 class OUTCAST_API AOutcastCharacter : public ACharacter
 {
@@ -117,19 +132,12 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ANIMATION ********
 
   //******** REPLICATION ********
-  UPROPERTY(ReplicatedUsing=ApplyReplicatedData)
-  FReplicatedData ReplicatedData;
-  void ExtractReplicatedData();
+  UPROPERTY(ReplicatedUsing = OnRep_ApplyState)
+  FState CurrentState;
+  void ExtractState();
   UFUNCTION()
-  void ApplyReplicatedData();
-  void FillReplicatedData();
-
-  UPROPERTY(ReplicatedUsing=ApplyReplicatedAnimData)
-  FReplicatedAnimData ReplicatedAnimData;
-  void ExtractReplicatedAnimData();
-  UFUNCTION()
-  void ApplyReplicatedAnimData();
-  void FillReplicatedAnimData();
+  void OnRep_ApplyState();
+  void CreateState();
   //******** REPLICATION ********
 
   //******** HELPERS ********
