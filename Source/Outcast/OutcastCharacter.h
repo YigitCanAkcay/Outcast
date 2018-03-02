@@ -59,6 +59,8 @@ struct FReplicatedData
   GENERATED_BODY()
 
   UPROPERTY()
+  EJump Jumping;
+  UPROPERTY()
   int Health;
   UPROPERTY()
   FVector CharacterRotation;
@@ -79,8 +81,6 @@ struct FReplicatedAnimData
   FVector LegsRotation;
   UPROPERTY()
   FVector TorsoRotation;
-  UPROPERTY()
-  EJump Jumping;
   UPROPERTY()
   EAttack Attacking;
 };
@@ -117,15 +117,17 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ANIMATION ********
 
   //******** REPLICATION ********
-  UPROPERTY(Replicated)
+  UPROPERTY(ReplicatedUsing=ApplyReplicatedData)
   FReplicatedData ReplicatedData;
   void ExtractReplicatedData();
+  UFUNCTION()
   void ApplyReplicatedData();
   void FillReplicatedData();
 
-  UPROPERTY(Replicated)
+  UPROPERTY(ReplicatedUsing=ApplyReplicatedAnimData)
   FReplicatedAnimData ReplicatedAnimData;
   void ExtractReplicatedAnimData();
+  UFUNCTION()
   void ApplyReplicatedAnimData();
   void FillReplicatedAnimData();
   //******** REPLICATION ********
@@ -229,7 +231,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COLLISION ********
 
   //******** TICK FUNCTIONS ********
-  void Local_LookAround();
   void LookAround();
   void MoveAround();
   void Jump();

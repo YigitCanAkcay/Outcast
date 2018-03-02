@@ -13,7 +13,7 @@ AOutcastCharacter::AOutcastCharacter()
   TorsoRotation(FRotator()),
   CharacterRotation(FRotator()),
   CharacterLocation(FVector()),
-  Jumping(EJump::NONE),
+  Jumping(EJump::Downwards),
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
   BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
@@ -95,7 +95,6 @@ AOutcastCharacter::AOutcastCharacter()
   Movement->MaxWalkSpeed = 1000.0f;
   Movement->MaxFlySpeed  = 10000.0f;
   Movement->GravityScale = 5.0f;
-  Movement->SetIsReplicated(true);
 
   bUseControllerRotationYaw   = false;
   bUseControllerRotationPitch = false;
@@ -110,7 +109,7 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
   DOREPLIFETIME(AOutcastCharacter, ReplicatedData);
-  DOREPLIFETIME_CONDITION(AOutcastCharacter, ReplicatedAnimData, COND_SimulatedOnly);
+  DOREPLIFETIME(AOutcastCharacter, ReplicatedAnimData);
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -123,9 +122,9 @@ void AOutcastCharacter::BeginPlay()
     Destroy();
   }
 
-  FillReplicatedData();
-  ReplicatedData.CharacterLocation = GetActorLocation();
-  ReplicatedData.CharacterRotation = ReturnFVector(GetActorRotation());
+  //FillReplicatedData();
+  //ReplicatedData.CharacterLocation = GetActorLocation();
+  //ReplicatedData.CharacterRotation = ReturnFVector(GetActorRotation());
 
   if (Body && Eye_L && Eye_R && Weapon && Armor)
   {
@@ -156,6 +155,7 @@ void AOutcastCharacter::BeginPlay()
 
 void AOutcastCharacter::ExtractReplicatedData()
 {
+  Jumping           = ReplicatedData.Jumping;
   CharacterLocation = ReplicatedData.CharacterLocation;
   CharacterRotation = ReturnFRotator(ReplicatedData.CharacterRotation);
   Health            = ReplicatedData.Health;
@@ -165,12 +165,17 @@ void AOutcastCharacter::ApplyReplicatedData()
 {
   ExtractReplicatedData();
 
+  if (Anim)
+  {
+    Anim->SetIsJumping(Jumping != EJump::NONE);
+  }
   SetActorRotation(CharacterRotation);
   SetActorLocation(CharacterLocation);
 }
 
 void AOutcastCharacter::FillReplicatedData()
 {
+  ReplicatedData.Jumping           = Jumping;
   ReplicatedData.CharacterLocation = CharacterLocation;
   ReplicatedData.CharacterRotation = ReturnFVector(CharacterRotation);
   ReplicatedData.Health            = Health;
@@ -182,7 +187,6 @@ void AOutcastCharacter::ExtractReplicatedAnimData()
   WalkPlayrate  = ReplicatedAnimData.WalkPlayrate;
   LegsRotation  = ReturnFRotator(ReplicatedAnimData.LegsRotation);
   TorsoRotation = ReturnFRotator(ReplicatedAnimData.TorsoRotation);
-  Jumping       = ReplicatedAnimData.Jumping;
   Attacking     = ReplicatedAnimData.Attacking;
 }
 
@@ -196,7 +200,6 @@ void AOutcastCharacter::ApplyReplicatedAnimData()
   Anim->SetWalkPlayrate(WalkPlayrate);
   Anim->SetLegsRotation(LegsRotation);
   Anim->SetTorsoRotation(TorsoRotation);
-  Anim->SetIsJumping(Jumping != EJump::NONE);
   Anim->SetIsSlashingLeft(Attacking == EAttack::Left);
   Anim->SetIsSlashingRight(Attacking == EAttack::Right);
   Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
@@ -209,7 +212,6 @@ void AOutcastCharacter::FillReplicatedAnimData()
   ReplicatedAnimData.WalkPlayrate  = WalkPlayrate;
   ReplicatedAnimData.LegsRotation  = ReturnFVector(LegsRotation);
   ReplicatedAnimData.TorsoRotation = ReturnFVector(TorsoRotation);
-  ReplicatedAnimData.Jumping       = Jumping;
   ReplicatedAnimData.Attacking     = Attacking;
 }
 
@@ -285,28 +287,6 @@ void AOutcastCharacter::BodyOverlapEnd(
         DamageTakenBy.Remove(AttackingCharacter);
       }
     }
-  }
-}
-
-void AOutcastCharacter::Local_LookAround()
-{
-  // Rotate the camera
-  FRotator NewCameraRot = Camera->GetComponentRotation();
-  NewCameraRot.Pitch = NewCameraRot.Pitch + MouseInput.Y;
-
-  if (NewCameraRot.Pitch >= -80.0f
-    && NewCameraRot.Pitch <= 80.0f)
-  {
-    Camera->SetWorldRotation(NewCameraRot);
-
-    FVector NewCameraLoc = Camera->RelativeLocation;
-    const float NewRadius = NewCameraLoc.Size();
-    const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
-
-    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
-    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
-
-    Camera->SetRelativeLocation(NewCameraLoc);
   }
 }
 
@@ -441,18 +421,15 @@ void AOutcastCharacter::MoveAround()
   {
     if (Jumping == EJump::NONE)
     {
-      //AddMovementInput(Direction, Speed / 5);
-      SetActorLocation(GetActorLocation() + Direction * Speed / 6);
+      AddMovementInput(Direction, Speed / 5);
     }
     else if (Jumping == EJump::BunnyHop)
     {
-      //AddMovementInput(Direction, Speed / BunnyHopSpeedRatio);
-      SetActorLocation(GetActorLocation() + Direction * Speed / BunnyHopSpeedRatio);
+      AddMovementInput(Direction, Speed / BunnyHopSpeedRatio);
     }
     else
     {
-      //AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
-      SetActorLocation(GetActorLocation() + Direction * Speed / DefaultJumpSpeedRatio);
+      AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
     }
   }
 
@@ -465,31 +442,28 @@ void AOutcastCharacter::MoveAround()
 
 void AOutcastCharacter::Jump()
 {
-  if (Role == ROLE_AutonomousProxy)
+  if (KeyMap[EKey::Space])
   {
-    if (KeyMap[EKey::Space])
+    if (Jumping != EJump::BunnyHop)
     {
-      if (Jumping != EJump::BunnyHop)
+      if (JumpHeight < JumpHeightLimit
+        && Jumping != EJump::Downwards)
       {
-        if (JumpHeight < JumpHeightLimit
-          && Jumping != EJump::Downwards)
+        if (Jumping == EJump::NONE)
         {
-          if (Jumping == EJump::NONE)
-          {
-            JumpStartLocZ = GetActorLocation().Z;
-          }
-          Jumping = EJump::Upwards;
+          JumpStartLocZ = GetActorLocation().Z;
         }
-        else
-        {
-          Jumping = EJump::Downwards;
-        }
+        Jumping = EJump::Upwards;
+      }
+      else
+      {
+        Jumping = EJump::Downwards;
       }
     }
-    else if ((Jumping == EJump::Upwards || Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
-    {
-      Jumping = EJump::Downwards;
-    }
+  }
+  else if ((Jumping == EJump::Upwards || Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
+  {
+    Jumping = EJump::Downwards;
   }
 
   Anim->SetIsJumping(Jumping != EJump::NONE);
@@ -497,8 +471,8 @@ void AOutcastCharacter::Jump()
   if (Jumping == EJump::Upwards)
   {
     JumpHeight = GetActorLocation().Z - JumpStartLocZ;
-    Movement->SetMovementMode(MOVE_Flying);
 
+    Movement->SetMovementMode(MOVE_Flying);
     AddMovementInput(GetActorUpVector(), 5.0f);
   }
   else if (Jumping == EJump::Downwards)
@@ -508,7 +482,7 @@ void AOutcastCharacter::Jump()
   else if (Jumping == EJump::NONE)
   {
     JumpHeight = 0.0f;
-    //Movement->SetMovementMode(MOVE_Walking);
+    Movement->SetMovementMode(MOVE_Walking);
   }
   else if (Jumping == EJump::BunnyHop)
   {
@@ -516,16 +490,36 @@ void AOutcastCharacter::Jump()
 
     AddMovementInput(GetActorUpVector(), 5.0f);
     Movement->SetMovementMode(MOVE_Flying);
-    if (Role == ROLE_AutonomousProxy)
+    if (JumpHeight > BunnyHopMaxHeight)
     {
-      if (JumpHeight > BunnyHopMaxHeight)
-      {
-        Jumping = EJump::Upwards;
-        BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
-      }
+      Jumping = EJump::Upwards;
+      BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
   }
+
+  /*if (HasAuthority())
+  {
+    FString TheJump;
+    switch (Jumping)
+    {
+    case EJump::NONE:
+      TheJump = FString("NONE");
+      break;
+    case EJump::Upwards:
+      TheJump = FString("Upwards");
+      break;
+    case EJump::Downwards:
+      TheJump = FString("Downwards");
+      break;
+    case EJump::BunnyHop:
+      TheJump = FString("BunnyHop");
+      break;
+    }
+    UE_LOG(LogTemp, Warning, TEXT("%s %s"), *GetName(), *TheJump);
+    CharacterLocation = GetActorLocation();
+  }*/
 }
+
 
 void AOutcastCharacter::Attack(const float DeltaTime)
 {
@@ -631,10 +625,10 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   MoveAround();
 
+  Jump();
+
   if (HasAuthority())
   {
-
-    //Jump();
 
     //Attack(DeltaTime);
 
@@ -645,12 +639,8 @@ void AOutcastCharacter::Tick(float DeltaTime)
   }
   else
   {
-    ApplyReplicatedData();
-  }
-
-  if (Role == ROLE_SimulatedProxy)
-  {
-    ApplyReplicatedAnimData();
+    //ApplyReplicatedData();
+    //ApplyReplicatedAnimData();
   }
 }
 
@@ -904,21 +894,18 @@ void AOutcastCharacter::OnHit(
   // Character is on top of a walkable plane
   if (OtherActor->ActorHasTag(FName("Walkable")))
   {
-    if (Role == ROLE_AutonomousProxy)
+    if (KeyMap[EKey::Space]
+      && (KeyMap[EKey::A] || KeyMap[EKey::D])
+      && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
     {
-      if (KeyMap[EKey::Space]
-        && (KeyMap[EKey::A] || KeyMap[EKey::D])
-        && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
-      {
-        Jumping = EJump::BunnyHop;
-        JumpHeight = 0.0f;
-        BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, BunnyHopFastestSpeedRatio, DefaultJumpSpeedRatio);
-      }
-      else
-      {
-        Jumping = EJump::NONE;
-        BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
-      }
+      Jumping = EJump::BunnyHop;
+      JumpHeight = 0.0f;
+      BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, BunnyHopFastestSpeedRatio, DefaultJumpSpeedRatio);
+    }
+    else
+    {
+      Jumping = EJump::NONE;
+      BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
   }
 }
