@@ -245,25 +245,22 @@ void AOutcastCharacter::BodyOverlapBegin(
   bool bFromSweep,
   const FHitResult& SweepResult)
 {
-  if (Role == ROLE_AutonomousProxy)
+  // Other Actor is the actor that triggered the event. Check that is not ourself.  
+  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
-    // Other Actor is the actor that triggered the event. Check that is not ourself.  
-    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
+    AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+
+    if (!DamageTakenBy.Contains(AttackingCharacter))
     {
-      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+      DamageTakenBy.Add(AttackingCharacter, 0.0f);
 
-      if (!DamageTakenBy.Contains(AttackingCharacter))
+      if (AttackingCharacter->GetAttack() == EAttack::NONE)
       {
-        DamageTakenBy.Add(AttackingCharacter, 0.0f);
-
-        if (AttackingCharacter->GetAttack() == EAttack::NONE)
-        {
-          Health = FMath::Clamp(Health - 1, 0, 100);
-        }
-        else
-        {
-          Health = FMath::Clamp(Health - 20, 0, 100);
-        }
+        Health = FMath::Clamp(Health - 1, 0, 100);
+      }
+      else
+      {
+        Health = FMath::Clamp(Health - 20, 0, 100);
       }
     }
   }
@@ -275,17 +272,14 @@ void AOutcastCharacter::BodyOverlapEnd(
   UPrimitiveComponent* OtherComp,
   int32 OtherBodyIndex)
 {
-  if (Role == ROLE_AutonomousProxy)
+  // Other Actor is the actor that triggered the event. Check that is not ourself.  
+  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
-    // Other Actor is the actor that triggered the event. Check that is not ourself.  
-    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
-    {
-      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+    AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
 
-      if (DamageTakenBy.Contains(AttackingCharacter))
-      {
-        DamageTakenBy.Remove(AttackingCharacter);
-      }
+    if (DamageTakenBy.Contains(AttackingCharacter))
+    {
+      DamageTakenBy.Remove(AttackingCharacter);
     }
   }
 }
@@ -496,75 +490,49 @@ void AOutcastCharacter::Jump()
       BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
   }
-
-  /*if (HasAuthority())
-  {
-    FString TheJump;
-    switch (Jumping)
-    {
-    case EJump::NONE:
-      TheJump = FString("NONE");
-      break;
-    case EJump::Upwards:
-      TheJump = FString("Upwards");
-      break;
-    case EJump::Downwards:
-      TheJump = FString("Downwards");
-      break;
-    case EJump::BunnyHop:
-      TheJump = FString("BunnyHop");
-      break;
-    }
-    UE_LOG(LogTemp, Warning, TEXT("%s %s"), *GetName(), *TheJump);
-    CharacterLocation = GetActorLocation();
-  }*/
 }
 
 
 void AOutcastCharacter::Attack(const float DeltaTime)
 {
-  if (Role == ROLE_AutonomousProxy)
+  if (Attacking == EAttack::Left)
   {
-    // Otherwise SimulatedProxies won't know when the attack animation has finished
-    if (Attacking == EAttack::Left)
-    {
-      Attacking = Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE;
-    }
-    else if (Attacking == EAttack::Right)
-    {
-      Attacking = Anim->GetIsSlashingRight() ? EAttack::Right : EAttack::NONE;
-    }
-    else if (Attacking == EAttack::Forward)
-    {
-      Attacking = Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE;
-    }
+    Attacking = Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE;
+  }
+  else if (Attacking == EAttack::Right)
+  {
+    Attacking = Anim->GetIsSlashingRight() ? EAttack::Right : EAttack::NONE;
+  }
+  else if (Attacking == EAttack::Forward)
+  {
+    Attacking = Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE;
+  }
 
-    if (MouseMap[EMouse::Left])
+  if (MouseMap[EMouse::Left])
+  {
+    if (Attacking == EAttack::NONE)
     {
-      if (Attacking == EAttack::NONE)
+      // Slashing left/right has priority over forward
+      if (KeyMap[EKey::A]
+        && !KeyMap[EKey::D])
       {
-        // Slashing left/right has priority over forward
-        if (KeyMap[EKey::A]
-          && !KeyMap[EKey::D])
-        {
-          Attacking = EAttack::Left;
-        }
-        else if (!KeyMap[EKey::A]
-          && KeyMap[EKey::D])
-        {
-          Attacking = EAttack::Right;
-        }
-        else if (!KeyMap[EKey::A]
-          && !KeyMap[EKey::D]
-          && KeyMap[EKey::W])
-        {
-          Attacking = EAttack::Forward;
-        }
-        else
-        {
-          int Random = FMath::RandRange(1, 3);
-          Attacking = static_cast<EAttack>(Random);
-        }
+        Attacking = EAttack::Left;
+      }
+      else if (!KeyMap[EKey::A]
+        && KeyMap[EKey::D])
+      {
+        Attacking = EAttack::Right;
+      }
+      else if (!KeyMap[EKey::A]
+        && !KeyMap[EKey::D]
+        && KeyMap[EKey::W])
+      {
+        Attacking = EAttack::Forward;
+      }
+      else
+      {
+        int Random = FMath::RandRange(1, 3);
+        Attacking = static_cast<EAttack>(Random);
       }
     }
   }
@@ -594,24 +562,21 @@ void AOutcastCharacter::Alive(const float DeltaTime)
     }
   }
 
-  if (Role == ROLE_AutonomousProxy)
+  for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
   {
-    for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
+    AttackerIt->Value = AttackerIt->Value + DeltaTime;
+
+    if (AttackerIt->Value >= 1.0f)
     {
-      AttackerIt->Value = AttackerIt->Value + DeltaTime;
+      AttackerIt->Value = 0.0f;
 
-      if (AttackerIt->Value >= 1.0f)
+      if (AttackerIt->Key->GetAttack() == EAttack::NONE)
       {
-        AttackerIt->Value = 0.0f;
-
-        if (AttackerIt->Key->GetAttack() == EAttack::NONE)
-        {
-          Health = FMath::Clamp(Health - 1, 0, 100);
-        }
-        else
-        {
-          Health = FMath::Clamp(Health - 20, 0, 100);
-        }
+        Health = FMath::Clamp(Health - 1, 0, 100);
+      }
+      else
+      {
+        Health = FMath::Clamp(Health - 20, 0, 100);
       }
     }
   }
@@ -627,20 +592,14 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   Jump();
 
+  Attack(DeltaTime);
+
+  Alive(DeltaTime);
+
   if (HasAuthority())
   {
-
-    //Attack(DeltaTime);
-
-    //Alive(DeltaTime);
-
     FillReplicatedData();
     FillReplicatedAnimData();
-  }
-  else
-  {
-    //ApplyReplicatedData();
-    //ApplyReplicatedAnimData();
   }
 }
 
