@@ -196,6 +196,27 @@ AOutcastCharacter::AOutcastCharacter()
   {
     JumpVocalSounds.Add(JumpVocal9.Object);
   }
+
+  static ConstructorHelpers::FObjectFinder<USoundWave> AttackVocal1(TEXT("SoundWave'/Game/Audio/Attacking/Vocals/Attack1.Attack1'"));
+  if (AttackVocal1.Succeeded())
+  {
+    AttackVocalSounds.Add(AttackVocal1.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> AttackVocal2(TEXT("SoundWave'/Game/Audio/Attacking/Vocals/Attack2.Attack2'"));
+  if (AttackVocal2.Succeeded())
+  {
+    AttackVocalSounds.Add(AttackVocal2.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> AttackVocal3(TEXT("SoundWave'/Game/Audio/Attacking/Vocals/Attack3.Attack3'"));
+  if (AttackVocal3.Succeeded())
+  {
+    AttackVocalSounds.Add(AttackVocal3.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> AttackVocal4(TEXT("SoundWave'/Game/Audio/Attacking/Vocals/Attack4.Attack4'"));
+  if (AttackVocal4.Succeeded())
+  {
+    AttackVocalSounds.Add(AttackVocal4.Object);
+  }
 }
 
 void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -348,13 +369,19 @@ int AOutcastCharacter::GetHealth()
 void AOutcastCharacter::PlayStepSound()
 {
   int Random = FMath::RandRange(0, 7);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), StepSounds[Random], GetActorLocation(), 0.5f, 1.0f, 0.0f, Attenuation);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), StepSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
 }
 
 void AOutcastCharacter::PlayJumpVocalSound()
 {
   int Random = FMath::RandRange(0, 8);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), JumpVocalSounds[Random], GetActorLocation(), 0.1f, 1.0f, 0.0f, Attenuation);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), JumpVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+}
+
+void AOutcastCharacter::PlayAttackVocalSound()
+{
+  int Random = FMath::RandRange(0, 3);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), AttackVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
 }
 
 void AOutcastCharacter::BodyOverlapBegin(
@@ -555,7 +582,6 @@ void AOutcastCharacter::Walk()
   if (HasAuthority())
   {
     CharacterLocation = GetActorLocation();
-    //UE_LOG(LogTemp, Warning, TEXT("%s: %s"), *GetName(), *ReplicatedData.CharacterLocation.ToString());
   }
 }
 
@@ -586,27 +612,6 @@ void AOutcastCharacter::Jump()
   }
 
   Anim->SetIsJumping(Jumping != EJump::NONE);
-
-  if (HasAuthority())
-  {
-    FString TheJump;
-    switch (Jumping)
-    {
-    case EJump::NONE:
-      TheJump = FString("NONE");
-      break;
-     case EJump::Upwards:
-       TheJump = FString("Upwards");
-       break;
-     case EJump::Downwards:
-       TheJump = FString("Downwards");
-       break;
-     case EJump::BunnyHop:
-       TheJump = FString("BunnyHop");
-       break;
-    }
-    UE_LOG(LogTemp, Warning, TEXT("%s %s"), *GetName(), *TheJump);
-  }
 
   if (Jumping == EJump::Upwards)
   {
@@ -918,21 +923,6 @@ void AOutcastCharacter::SpaceReleased()
 void AOutcastCharacter::Server_SetKey_Implementation(const EKey Key, const bool bIsPressed)
 {
   KeyMap.Add(Key, bIsPressed);
-
-  /*FString TheRole;
-  switch (Role)
-  {
-  case ROLE_Authority:
-    TheRole = FString("Authority");
-    break;
-  case ROLE_AutonomousProxy:
-    TheRole = FString("AutonomousProxy");
-    break;
-  case ROLE_SimulatedProxy:
-    TheRole = FString("SimulatedProxy");
-    break;
-  }
-  UE_LOG(LogTemp, Warning, TEXT("Key Hit: %s"), *TheRole)*/
 }
 
 bool AOutcastCharacter::Server_SetKey_Validate(const EKey Key, const bool bIsPressed)
@@ -1002,10 +992,6 @@ void AOutcastCharacter::OnHit(
   // Character is on top of a walkable plane
   if (OtherActor->ActorHasTag(FName("Walkable")))
   {
-    if (IsLocallyControlled())
-    {
-      UE_LOG(LogTemp, Warning, TEXT("HIT!"));
-    }
     if (KeyMap[EKey::Space]
       && (KeyMap[EKey::A] || KeyMap[EKey::D])
       && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))

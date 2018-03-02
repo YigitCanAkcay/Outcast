@@ -145,11 +145,14 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ASSETS ********
   TArray<USoundWave*> StepSounds;
   TArray<USoundWave*> JumpVocalSounds;
+  TArray<USoundWave*> AttackVocalSounds;
 
   UFUNCTION(BlueprintCallable)
   void PlayStepSound();
   UFUNCTION(BlueprintCallable)
   void PlayJumpVocalSound();
+  UFUNCTION(BlueprintCallable)
+  void PlayAttackVocalSound();
 
   USoundAttenuation* Attenuation;
   //******** ASSETS ********
