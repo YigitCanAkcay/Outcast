@@ -19,17 +19,16 @@ AOutcastCharacter::AOutcastCharacter()
   BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
   Attacking(EAttack::NONE),
   Health(100),
-  LeftMouseTimer(0.0f),
   MouseInput(FVector2D::ZeroVector)
 {
  	PrimaryActorTick.bCanEverTick = true;
 
   // Initialize KeyMap
-  KeyMap.Add(EKeys::W, false);
-  KeyMap.Add(EKeys::A, false);
-  KeyMap.Add(EKeys::S, false);
-  KeyMap.Add(EKeys::D, false);
-  KeyMap.Add(EKeys::Space, false);
+  KeyMap.Add(EKey::W, false);
+  KeyMap.Add(EKey::A, false);
+  KeyMap.Add(EKey::S, false);
+  KeyMap.Add(EKey::D, false);
+  KeyMap.Add(EKey::Space, false);
 
   // Initialize Mouse Input
   MouseMap.Add(EMouse::Left, false);
@@ -96,6 +95,7 @@ AOutcastCharacter::AOutcastCharacter()
   Movement->MaxWalkSpeed = 1000.0f;
   Movement->MaxFlySpeed  = 10000.0f;
   Movement->GravityScale = 5.0f;
+  Movement->SetIsReplicated(true);
 
   bUseControllerRotationYaw   = false;
   bUseControllerRotationPitch = false;
@@ -110,19 +110,22 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
   DOREPLIFETIME(AOutcastCharacter, ReplicatedData);
+  DOREPLIFETIME_CONDITION(AOutcastCharacter, ReplicatedAnimData, COND_SimulatedOnly);
 }
 
 void AOutcastCharacter::BeginPlay()
 {
   Super::BeginPlay();
 
-  FillReplicatedData();
-
   Anim = Cast<UOutcastAnimInstance>(Body->GetAnimInstance());
   if (!Anim)
   {
     Destroy();
   }
+
+  FillReplicatedData();
+  ReplicatedData.CharacterLocation = GetActorLocation();
+  ReplicatedData.CharacterRotation = ReturnFVector(GetActorRotation());
 
   if (Body && Eye_L && Eye_R && Weapon && Armor)
   {
@@ -153,93 +156,78 @@ void AOutcastCharacter::BeginPlay()
 
 void AOutcastCharacter::ExtractReplicatedData()
 {
-  Speed             = ReplicatedData.Speed;
-  WalkPlayrate      = ReplicatedData.WalkPlayrate;
-  LegsRotation      = ReplicatedData.LegsRotation;
-  TorsoRotation     = ReplicatedData.TorsoRotation;
-  CharacterRotation = ReplicatedData.CharacterRotation;
-  Jumping           = ReplicatedData.Jumping;
-  Attacking         = ReplicatedData.Attacking;
   CharacterLocation = ReplicatedData.CharacterLocation;
+  CharacterRotation = ReturnFRotator(ReplicatedData.CharacterRotation);
   Health            = ReplicatedData.Health;
+}
+
+void AOutcastCharacter::ApplyReplicatedData()
+{
+  ExtractReplicatedData();
+
+  SetActorRotation(CharacterRotation);
+  SetActorLocation(CharacterLocation);
 }
 
 void AOutcastCharacter::FillReplicatedData()
 {
-  ReplicatedData.Speed             = Speed;
-  ReplicatedData.WalkPlayrate      = WalkPlayrate;
-  ReplicatedData.LegsRotation      = LegsRotation;
-  ReplicatedData.TorsoRotation     = TorsoRotation;
-  ReplicatedData.CharacterRotation = CharacterRotation;
-  ReplicatedData.Jumping           = Jumping;
-  ReplicatedData.Attacking         = Attacking;
   ReplicatedData.CharacterLocation = CharacterLocation;
+  ReplicatedData.CharacterRotation = ReturnFVector(CharacterRotation);
   ReplicatedData.Health            = Health;
 }
 
-void AOutcastCharacter::SetReplicatedData(const FReplicatedData NewReplicatedData)
+void AOutcastCharacter::ExtractReplicatedAnimData()
 {
-  ReplicatedData = NewReplicatedData;
-  if (!HasAuthority())
+  Speed         = ReplicatedAnimData.Speed;
+  WalkPlayrate  = ReplicatedAnimData.WalkPlayrate;
+  LegsRotation  = ReturnFRotator(ReplicatedAnimData.LegsRotation);
+  TorsoRotation = ReturnFRotator(ReplicatedAnimData.TorsoRotation);
+  Jumping       = ReplicatedAnimData.Jumping;
+  Attacking     = ReplicatedAnimData.Attacking;
+}
+
+void AOutcastCharacter::ApplyReplicatedAnimData()
+{
+  ExtractReplicatedAnimData();
+
+  if (Anim)
   {
-    Server_SetReplicatedData(NewReplicatedData);
+  Anim->SetAcceleration(Speed);
+  Anim->SetWalkPlayrate(WalkPlayrate);
+  Anim->SetLegsRotation(LegsRotation);
+  Anim->SetTorsoRotation(TorsoRotation);
+  Anim->SetIsJumping(Jumping != EJump::NONE);
+  Anim->SetIsSlashingLeft(Attacking == EAttack::Left);
+  Anim->SetIsSlashingRight(Attacking == EAttack::Right);
+  Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
   }
 }
-void AOutcastCharacter::Server_SetReplicatedData_Implementation(const FReplicatedData NewReplicatedData)
+
+void AOutcastCharacter::FillReplicatedAnimData()
 {
-  ReplicatedData = NewReplicatedData;
-}
-bool AOutcastCharacter::Server_SetReplicatedData_Validate(const FReplicatedData NewReplicatedData)
-{
-  return true;
+  ReplicatedAnimData.Speed         = Speed;
+  ReplicatedAnimData.WalkPlayrate  = WalkPlayrate;
+  ReplicatedAnimData.LegsRotation  = ReturnFVector(LegsRotation);
+  ReplicatedAnimData.TorsoRotation = ReturnFVector(TorsoRotation);
+  ReplicatedAnimData.Jumping       = Jumping;
+  ReplicatedAnimData.Attacking     = Attacking;
 }
 
-void AOutcastCharacter::SetSpeed(const float NewSpeed)
+FVector AOutcastCharacter::ReturnFVector(const FRotator& Rotator)
 {
-  Speed = NewSpeed;
-  ReplicatedData.Speed = Speed;
+  FVector Vector;
+  Vector.X = Rotator.Pitch;
+  Vector.Y = Rotator.Roll;
+  Vector.Z = Rotator.Yaw;
+  return Vector;
 }
-
-void AOutcastCharacter::SetWalkPlayrate(const float NewWalkPlayrate)
+FRotator AOutcastCharacter::ReturnFRotator(const FVector& Vector)
 {
-  WalkPlayrate = NewWalkPlayrate;
-  ReplicatedData.WalkPlayrate = WalkPlayrate;
-}
-
-void AOutcastCharacter::SetLegsRotation(const FRotator NewLegsRotation)
-{
-  LegsRotation = NewLegsRotation;
-  ReplicatedData.LegsRotation = LegsRotation;
-}
-
-void AOutcastCharacter::SetTorsoRotation(const FRotator NewTorsoRotation)
-{
-  TorsoRotation = NewTorsoRotation;
-  ReplicatedData.TorsoRotation = TorsoRotation;
-}
-
-void AOutcastCharacter::SetCharacterRotation(const FRotator NewCharacterRotation)
-{
-  CharacterRotation = NewCharacterRotation;
-  ReplicatedData.CharacterRotation = CharacterRotation;
-}
-
-void AOutcastCharacter::SetJumping(const EJump NewJumping)
-{
-  Jumping = NewJumping;
-  ReplicatedData.Jumping = Jumping;
-}
-
-void AOutcastCharacter::SetAttack(const EAttack NewAttack)
-{
-  Attacking = NewAttack;
-  ReplicatedData.Attacking = Attacking;
-}
-
-void AOutcastCharacter::SetHealth(const int NewHealth)
-{
-  Health = NewHealth;
-  ReplicatedData.Health = Health;
+  FRotator Rotator;
+  Rotator.Pitch = Vector.X;
+  Rotator.Roll = Vector.Y;
+  Rotator.Yaw = Vector.Z;
+  return Rotator;
 }
 
 int AOutcastCharacter::GetHealth()
@@ -268,11 +256,11 @@ void AOutcastCharacter::BodyOverlapBegin(
 
         if (AttackingCharacter->GetAttack() == EAttack::NONE)
         {
-          SetHealth(FMath::Clamp(Health - 1, 0, 100));
+          Health = FMath::Clamp(Health - 1, 0, 100);
         }
         else
         {
-          SetHealth(FMath::Clamp(Health - 20, 0, 100));
+          Health = FMath::Clamp(Health - 20, 0, 100);
         }
       }
     }
@@ -300,93 +288,103 @@ void AOutcastCharacter::BodyOverlapEnd(
   }
 }
 
+void AOutcastCharacter::Local_LookAround()
+{
+  // Rotate the camera
+  FRotator NewCameraRot = Camera->GetComponentRotation();
+  NewCameraRot.Pitch = NewCameraRot.Pitch + MouseInput.Y;
+
+  if (NewCameraRot.Pitch >= -80.0f
+    && NewCameraRot.Pitch <= 80.0f)
+  {
+    Camera->SetWorldRotation(NewCameraRot);
+
+    FVector NewCameraLoc = Camera->RelativeLocation;
+    const float NewRadius = NewCameraLoc.Size();
+    const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
+
+    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
+    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
+
+    Camera->SetRelativeLocation(NewCameraLoc);
+  }
+}
+
 void AOutcastCharacter::LookAround()
 {
-  if (Role == ROLE_AutonomousProxy)
-  {
-    // Rotate whole Character
-    CharacterRotation = GetActorRotation();
-    CharacterRotation.Yaw = CharacterRotation.Yaw + MouseInput.X;
-    SetCharacterRotation(CharacterRotation);
-
-    // Rotate the torso of the character
-    TorsoRotation = Anim->GetTorsoRotation();
-    TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
-    SetTorsoRotation(TorsoRotation);
-
-    // Rotate the camera
-    FRotator NewCameraRot = Camera->GetComponentRotation();
-    NewCameraRot.Pitch = NewCameraRot.Pitch + MouseInput.Y;
-
-    if (NewCameraRot.Pitch >= -80.0f
-      && NewCameraRot.Pitch <= 80.0f)
-    {
-      Camera->SetWorldRotation(NewCameraRot);
-
-      FVector NewCameraLoc = Camera->RelativeLocation;
-      const float NewRadius = NewCameraLoc.Size();
-      const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
-
-      NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
-      NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
-
-      Camera->SetRelativeLocation(NewCameraLoc);
-    }
-  }
-
-  Anim->SetTorsoRotation(TorsoRotation);
+  // Rotate whole Character
+  CharacterRotation = GetActorRotation();
+  CharacterRotation.Yaw = CharacterRotation.Yaw + MouseInput.X;
   SetActorRotation(CharacterRotation);
+
+  // Rotate the torso of the character
+  TorsoRotation = Anim->GetTorsoRotation();
+  TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
+  Anim->SetTorsoRotation(TorsoRotation);
+
+  // Rotate the camera
+  FRotator NewCameraRot = Camera->GetComponentRotation();
+  NewCameraRot.Pitch = NewCameraRot.Pitch + MouseInput.Y;
+
+  if (NewCameraRot.Pitch >= -80.0f
+    && NewCameraRot.Pitch <= 80.0f)
+  {
+    Camera->SetWorldRotation(NewCameraRot);
+
+    FVector NewCameraLoc = Camera->RelativeLocation;
+    const float NewRadius = NewCameraLoc.Size();
+    const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
+
+    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
+    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
+
+    Camera->SetRelativeLocation(NewCameraLoc);
+  }
 }
 
 void AOutcastCharacter::MoveAround()
 {
-  if (Role == ROLE_AutonomousProxy)
+  Direction = FVector(0.0f, 0.0f, 0.0f);
+  WalkPlayrate = 1.0f;
+
+  //**** DIRECTION ****
+  if (KeyMap[EKey::W])
   {
-    Direction = FVector(0.0f, 0.0f, 0.0f);
-    WalkPlayrate = 1.0f;
+    Direction = Direction + GetActorRotation().Vector();
+  }
 
-    //**** DIRECTION ****
-    if (KeyMap[EKeys::W])
-    {
-      Direction = Direction + GetActorRotation().Vector();
-    }
+  if (KeyMap[EKey::A])
+  {
+    FRotator Rot = GetActorRotation();
+    Rot.Yaw = Rot.Yaw - 90.0f;
+    Direction = Direction + Rot.Vector();
+  }
 
-    if (KeyMap[EKeys::A])
-    {
-      FRotator Rot = GetActorRotation();
-      Rot.Yaw      = Rot.Yaw - 90.0f;
-      Direction    = Direction + Rot.Vector();
-    }
+  if (KeyMap[EKey::S])
+  {
+    Direction = Direction + GetActorRotation().Vector() * -1;
+    WalkPlayrate = -1.0f;
+  }
 
-    if (KeyMap[EKeys::S])
-    {
-      Direction    = Direction + GetActorRotation().Vector() * -1;
-      WalkPlayrate = -1.0f;
-    }
+  if (KeyMap[EKey::D])
+  {
+    FRotator Rot = GetActorRotation();
+    Rot.Yaw = Rot.Yaw + 90.0f;
+    Direction = Direction + Rot.Vector();
+  }
+  //**** DIRECTION ****
 
-    if (KeyMap[EKeys::D])
-    {
-      FRotator Rot = GetActorRotation();
-      Rot.Yaw      = Rot.Yaw + 90.0f;
-      Direction    = Direction + Rot.Vector();
-    }
-    //**** DIRECTION ****
-
-    //**** SPEED ****
-    if ( KeyMap[EKeys::W] && !KeyMap[EKeys::S]
-      || KeyMap[EKeys::A] && !KeyMap[EKeys::D]
-      || KeyMap[EKeys::S] && !KeyMap[EKeys::W]
-      || KeyMap[EKeys::D] && !KeyMap[EKeys::A])
-    {
-      Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
-    }
-    else
-    {
-      Speed = FMath::Clamp(Speed - 5.0f, MinSpeed, MaxSpeed);
-    }
-
-    SetSpeed(Speed);
-    SetWalkPlayrate(WalkPlayrate);
+  //**** SPEED ****
+  if (KeyMap[EKey::W] && !KeyMap[EKey::S]
+    || KeyMap[EKey::A] && !KeyMap[EKey::D]
+    || KeyMap[EKey::S] && !KeyMap[EKey::W]
+    || KeyMap[EKey::D] && !KeyMap[EKey::A])
+  {
+    Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
+  }
+  else
+  {
+    Speed = FMath::Clamp(Speed - 5.0f, MinSpeed, MaxSpeed);
   }
 
   Anim->SetAcceleration(Speed);
@@ -399,48 +397,43 @@ void AOutcastCharacter::MoveAround()
   //**** SPEED ****
 
   //**** LEGS ROTATION ****
-  if (Role == ROLE_AutonomousProxy)
+  if (KeyMap[EKey::W])
   {
-    if (KeyMap[EKeys::W])
+    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+    if (KeyMap[EKey::A])
     {
-      LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-      if (KeyMap[EKeys::A])
-      {
-        LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
-      }
-      else if (KeyMap[EKeys::D])
-      {
-        LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
-      }
+      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
     }
-    else if (KeyMap[EKeys::S])
+    else if (KeyMap[EKey::D])
     {
-      LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-      if (KeyMap[EKeys::A])
-      {
-        LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
-      }
-      else if (KeyMap[EKeys::D])
-      {
-        LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
-      }
+      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
     }
-    else if (KeyMap[EKeys::A] && !KeyMap[EKeys::D])
-    {
-      LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
-    }
-    else if (KeyMap[EKeys::D] && !KeyMap[EKeys::A])
-    {
-      LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
-    }
-    else
-    {
-      LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-    }
-
-    SetLegsRotation(LegsRotation);
   }
-  
+  else if (KeyMap[EKey::S])
+  {
+    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+    if (KeyMap[EKey::A])
+    {
+      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+    }
+    else if (KeyMap[EKey::D])
+    {
+      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+    }
+  }
+  else if (KeyMap[EKey::A] && !KeyMap[EKey::D])
+  {
+    LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
+  }
+  else if (KeyMap[EKey::D] && !KeyMap[EKey::A])
+  {
+    LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
+  }
+  else
+  {
+    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
+  }
+
   Anim->SetLegsRotation(LegsRotation);
   //**** LEGS ROTATION ****
 
@@ -448,25 +441,25 @@ void AOutcastCharacter::MoveAround()
   {
     if (Jumping == EJump::NONE)
     {
-      AddMovementInput(Direction, Speed / 5);
+      //AddMovementInput(Direction, Speed / 5);
+      SetActorLocation(GetActorLocation() + Direction * Speed / 6);
     }
     else if (Jumping == EJump::BunnyHop)
     {
-      AddMovementInput(Direction, Speed / BunnyHopSpeedRatio);
+      //AddMovementInput(Direction, Speed / BunnyHopSpeedRatio);
+      SetActorLocation(GetActorLocation() + Direction * Speed / BunnyHopSpeedRatio);
     }
     else
     {
-      AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
+      //AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
+      SetActorLocation(GetActorLocation() + Direction * Speed / DefaultJumpSpeedRatio);
     }
   }
 
   if (HasAuthority())
   {
-    ReplicatedData.CharacterLocation = GetActorLocation();
-  }
-  else
-  {
-    SetActorLocation(CharacterLocation);
+    CharacterLocation = GetActorLocation();
+    //UE_LOG(LogTemp, Warning, TEXT("%s: %s"), *GetName(), *ReplicatedData.CharacterLocation.ToString());
   }
 }
 
@@ -474,7 +467,7 @@ void AOutcastCharacter::Jump()
 {
   if (Role == ROLE_AutonomousProxy)
   {
-    if (KeyMap[EKeys::Space])
+    if (KeyMap[EKey::Space])
     {
       if (Jumping != EJump::BunnyHop)
       {
@@ -485,17 +478,17 @@ void AOutcastCharacter::Jump()
           {
             JumpStartLocZ = GetActorLocation().Z;
           }
-          SetJumping(EJump::Upwards);
+          Jumping = EJump::Upwards;
         }
         else
         {
-          SetJumping(EJump::Downwards);
+          Jumping = EJump::Downwards;
         }
       }
     }
     else if ((Jumping == EJump::Upwards || Jumping == EJump::BunnyHop) && JumpHeight >= MinJumpHeight)
     {
-      SetJumping(EJump::Downwards);
+      Jumping = EJump::Downwards;
     }
   }
 
@@ -527,7 +520,7 @@ void AOutcastCharacter::Jump()
     {
       if (JumpHeight > BunnyHopMaxHeight)
       {
-        SetJumping(EJump::Upwards);
+        Jumping = EJump::Upwards;
         BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
       }
     }
@@ -541,51 +534,42 @@ void AOutcastCharacter::Attack(const float DeltaTime)
     // Otherwise SimulatedProxies won't know when the attack animation has finished
     if (Attacking == EAttack::Left)
     {
-      SetAttack(Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE);
+      Attacking = Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE;
     }
     else if (Attacking == EAttack::Right)
     {
-      SetAttack(Anim->GetIsSlashingRight() ? EAttack::Right : EAttack::NONE);
+      Attacking = Anim->GetIsSlashingRight() ? EAttack::Right : EAttack::NONE;
     }
     else if (Attacking == EAttack::Forward)
     {
-      SetAttack(Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE);
+      Attacking = Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE;
     }
 
     if (MouseMap[EMouse::Left])
     {
-      // Disable holding down the left mouse button
-      // Each attack has to be pressed separatly
-      LeftMouseTimer += DeltaTime;
-      if (LeftMouseTimer >= 1.0f)
-      {
-        MouseMap[EMouse::Left] = false;
-        LeftMouseTimer = 0.0f;
-      }
-
       if (Attacking == EAttack::NONE)
       {
         // Slashing left/right has priority over forward
-        if (KeyMap[EKeys::A]
-          && !KeyMap[EKeys::D])
+        if (KeyMap[EKey::A]
+          && !KeyMap[EKey::D])
         {
-          SetAttack(EAttack::Left);
+          Attacking = EAttack::Left;
         }
-        else if (!KeyMap[EKeys::A]
-          && KeyMap[EKeys::D])
+        else if (!KeyMap[EKey::A]
+          && KeyMap[EKey::D])
         {
-          SetAttack(EAttack::Right);
+          Attacking = EAttack::Right;
         }
-        else if (!KeyMap[EKeys::A]
-          && !KeyMap[EKeys::D]
-          && KeyMap[EKeys::W])
+        else if (!KeyMap[EKey::A]
+          && !KeyMap[EKey::D]
+          && KeyMap[EKey::W])
         {
-          SetAttack(EAttack::Forward);
+          Attacking = EAttack::Forward;
         }
         else
         {
           int Random = FMath::RandRange(1, 3);
-          SetAttack(static_cast<EAttack>(Random));
+          Attacking = static_cast<EAttack>(Random);
         }
       }
     }
@@ -615,23 +599,6 @@ void AOutcastCharacter::Alive(const float DeltaTime)
       Cast<AOutcastGameMode>(GetWorld()->GetAuthGameMode())->Respawn(MyPlayerController);
     }
   }
-}
-
-void AOutcastCharacter::Tick(float DeltaTime)
-{
-  Super::Tick(DeltaTime);
-
-  ExtractReplicatedData();
-
-  LookAround();
-
-  MoveAround();
-
-  Jump();
-
-  Attack(DeltaTime);
-
-  Alive(DeltaTime);
 
   if (Role == ROLE_AutonomousProxy)
   {
@@ -645,19 +612,45 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
         if (AttackerIt->Key->GetAttack() == EAttack::NONE)
         {
-          SetHealth(FMath::Clamp(Health - 1, 0, 100));
+          Health = FMath::Clamp(Health - 1, 0, 100);
         }
         else
         {
-          SetHealth(FMath::Clamp(Health - 20, 0, 100));
+          Health = FMath::Clamp(Health - 20, 0, 100);
         }
       }
     }
   }
+}
 
-  if (Role == ROLE_AutonomousProxy)
+void AOutcastCharacter::Tick(float DeltaTime)
+{
+  Super::Tick(DeltaTime);
+
+  LookAround();
+
+  MoveAround();
+
+  if (HasAuthority())
   {
-    SetReplicatedData(ReplicatedData);
+
+    //Jump();
+
+    //Attack(DeltaTime);
+
+    //Alive(DeltaTime);
+
+    FillReplicatedData();
+    FillReplicatedAnimData();
+  }
+  else
+  {
+    ApplyReplicatedData();
+  }
+
+  if (Role == ROLE_SimulatedProxy)
+  {
+    ApplyReplicatedAnimData();
   }
 }
 
@@ -766,83 +759,139 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 void AOutcastCharacter::WPressed()
 {
-  KeyMap.Add(EKeys::W, true);
+  KeyMap.Add(EKey::W, true);
+  Server_SetKey(EKey::W, true);
 }
 
 void AOutcastCharacter::WReleased()
 {
-  KeyMap.Add(EKeys::W, false);
+  KeyMap.Add(EKey::W, false);
+  Server_SetKey(EKey::W, false);
 }
 
 void AOutcastCharacter::APressed()
 {
-  KeyMap.Add(EKeys::A, true);
+  KeyMap.Add(EKey::A, true);
+  Server_SetKey(EKey::A, true);
 }
 
 void AOutcastCharacter::AReleased()
 {
-  KeyMap.Add(EKeys::A, false);
+  KeyMap.Add(EKey::A, false);
+  Server_SetKey(EKey::A, false);
 }
 
 void AOutcastCharacter::SPressed()
 {
-  KeyMap.Add(EKeys::S, true);
+  KeyMap.Add(EKey::S, true);
+  Server_SetKey(EKey::S, true);
 }
 
 void AOutcastCharacter::SReleased()
 {
-  KeyMap.Add(EKeys::S, false);
+  KeyMap.Add(EKey::S, false);
+  Server_SetKey(EKey::S, false);
 }
 
 void AOutcastCharacter::DPressed()
 {
-  KeyMap.Add(EKeys::D, true);
+  KeyMap.Add(EKey::D, true);
+  Server_SetKey(EKey::D, true);
 }
 
 void AOutcastCharacter::DReleased()
 {
-  KeyMap.Add(EKeys::D, false);
+  KeyMap.Add(EKey::D, false);
+  Server_SetKey(EKey::D, false);
 }
 
 void AOutcastCharacter::SpacePressed()
 {
-  KeyMap.Add(EKeys::Space, true);
+  KeyMap.Add(EKey::Space, true);
+  Server_SetKey(EKey::Space, true);
 }
 
 void AOutcastCharacter::SpaceReleased()
 {
-  KeyMap.Add(EKeys::Space, false);
+  KeyMap.Add(EKey::Space, false);
+  Server_SetKey(EKey::Space, false);
+}
+
+void AOutcastCharacter::Server_SetKey_Implementation(const EKey Key, const bool bIsPressed)
+{
+  KeyMap.Add(Key, bIsPressed);
+
+  /*FString TheRole;
+  switch (Role)
+  {
+  case ROLE_Authority:
+    TheRole = FString("Authority");
+    break;
+  case ROLE_AutonomousProxy:
+    TheRole = FString("AutonomousProxy");
+    break;
+  case ROLE_SimulatedProxy:
+    TheRole = FString("SimulatedProxy");
+    break;
+  }
+  UE_LOG(LogTemp, Warning, TEXT("Key Hit: %s"), *TheRole)*/
+}
+
+bool AOutcastCharacter::Server_SetKey_Validate(const EKey Key, const bool bIsPressed)
+{
+  return true;
 }
 
 void AOutcastCharacter::MouseLeftPressed()
 {
-  MouseMap.Add(EMouse::Left, true);
-  LeftMouseTimer = 0.0f;
+  Server_SetMouse(EMouse::Left, true);
 }
 
 void AOutcastCharacter::MouseRightPressed()
 {
-  MouseMap.Add(EMouse::Right, true);
+  Server_SetMouse(EMouse::Right, true);
 }
 
 void AOutcastCharacter::MouseLeftReleased()
 {
-  MouseMap.Add(EMouse::Left, false);
+  Server_SetMouse(EMouse::Left, false);
 }
 
 void AOutcastCharacter::MouseRightReleased()
 {
-  MouseMap.Add(EMouse::Right, false);
+  Server_SetMouse(EMouse::Right, false);
 }
 
 void AOutcastCharacter::MouseUpDown(const float AxisValue)
 {
   MouseInput.Y = AxisValue;
+  Server_SetMouseInput(MouseInput);
 }
 
 void AOutcastCharacter::MouseRightLeft(const float AxisValue)
 {
   MouseInput.X = AxisValue;
+  Server_SetMouseInput(MouseInput);
+}
+
+void AOutcastCharacter::Server_SetMouse_Implementation(const EMouse Key, const bool bIsPressed)
+{
+  MouseMap.Add(Key, bIsPressed);
+}
+
+bool AOutcastCharacter::Server_SetMouse_Validate(const EMouse Key, const bool bIsPressed)
+{
+  return true;
+}
+
+void AOutcastCharacter::Server_SetMouseInput_Implementation(const FVector2D NewMouseInput)
+{
+  MouseInput = NewMouseInput;
+}
+
+bool AOutcastCharacter::Server_SetMouseInput_Validate(const FVector2D NewMouseInput)
+{
+  return true;
 }
 
 void AOutcastCharacter::OnHit(
@@ -857,17 +906,17 @@ void AOutcastCharacter::OnHit(
   {
     if (Role == ROLE_AutonomousProxy)
     {
-      if (KeyMap[EKeys::Space]
-        && (KeyMap[EKeys::A] || KeyMap[EKeys::D])
+      if (KeyMap[EKey::Space]
+        && (KeyMap[EKey::A] || KeyMap[EKey::D])
         && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
       {
-        SetJumping(EJump::BunnyHop);
+        Jumping = EJump::BunnyHop;
         JumpHeight = 0.0f;
         BunnyHopSpeedRatio = FMath::Clamp(BunnyHopSpeedRatio / 3.0f, BunnyHopFastestSpeedRatio, DefaultJumpSpeedRatio);
       }
       else
       {
-        SetJumping(EJump::NONE);
+        Jumping = EJump::NONE;
         BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
       }
     }

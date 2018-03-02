@@ -36,8 +36,38 @@ enum class EAttack
   Forward = 3
 };
 
+UENUM()
+enum class EKey
+{
+  W,
+  A,
+  S,
+  D,
+  Space
+};
+
+UENUM()
+enum class EMouse
+{
+  Left,
+  Right
+};
+
 USTRUCT()
 struct FReplicatedData
+{
+  GENERATED_BODY()
+
+  UPROPERTY()
+  int Health;
+  UPROPERTY()
+  FVector CharacterRotation;
+  UPROPERTY()
+  FVector CharacterLocation;
+};
+
+USTRUCT()
+struct FReplicatedAnimData
 {
   GENERATED_BODY()
 
@@ -46,19 +76,13 @@ struct FReplicatedData
   UPROPERTY()
   float WalkPlayrate;
   UPROPERTY()
-  FRotator LegsRotation;
+  FVector LegsRotation;
   UPROPERTY()
-  FRotator TorsoRotation;
-  UPROPERTY()
-  FRotator CharacterRotation;
+  FVector TorsoRotation;
   UPROPERTY()
   EJump Jumping;
   UPROPERTY()
   EAttack Attacking;
-  UPROPERTY()
-  FVector CharacterLocation;
-  UPROPERTY()
-  int Health;
 };
 
 UCLASS()
@@ -96,12 +120,20 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   UPROPERTY(Replicated)
   FReplicatedData ReplicatedData;
   void ExtractReplicatedData();
+  void ApplyReplicatedData();
   void FillReplicatedData();
 
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetReplicatedData(const FReplicatedData NewReplicatedData);
-  void SetReplicatedData(const FReplicatedData NewReplicatedData);
+  UPROPERTY(Replicated)
+  FReplicatedAnimData ReplicatedAnimData;
+  void ExtractReplicatedAnimData();
+  void ApplyReplicatedAnimData();
+  void FillReplicatedAnimData();
   //******** REPLICATION ********
+
+  //******** HELPERS ********
+  FVector ReturnFVector(const FRotator& Rotator);
+  FRotator ReturnFRotator(const FVector& Vector);
+  //******** HELPERS ********
 
   //******** BASIC MOVEMENT ********
   float Speed;
@@ -114,12 +146,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   FRotator CharacterRotation;
   FVector CharacterLocation;
 
-  void SetSpeed(const float NewSpeed);
-  void SetWalkPlayrate(const float NewWalkPlayrate);
-  void SetLegsRotation(const FRotator NewLegsRotation);
-  void SetTorsoRotation(const FRotator NewTorsoRotation);
-  void SetCharacterRotation(const FRotator NewCharacterRotation);
-
   EJump Jumping;
   float JumpHeight;
   float JumpStartLocZ;
@@ -130,13 +156,9 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   const float DefaultJumpSpeedRatio     = 120.0f;
   const float BunnyHopMaxHeight         = 100.0f;
   const float BunnyHopFastestSpeedRatio = 20.0f;
-
-  void SetJumping(const EJump NewJumping);
   //******** BASIC MOVEMENT ********
 
   //******** ATTACKING ********
-  float LeftMouseTimer;
-
   UFUNCTION(BlueprintCallable)
   int GetHealth();
 
@@ -144,9 +166,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   EAttack Attacking;
   int Health;
-
-  void SetAttack(const EAttack NewAttack);
-  void SetHealth(const int NewHealth);
 
   UFUNCTION()
   void BodyOverlapBegin(
@@ -165,21 +184,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ATTACKING ********
 
   //******** PLAYER INPUT ********
-  enum class EKeys
-  {
-    W,
-    A,
-    S,
-    D,
-    Space
-  };
-  enum class EMouse
-  {
-    Left,
-    Right
-  };
-
-  TMap<EKeys, bool> KeyMap;
+  TMap<EKey, bool> KeyMap;
   void WPressed();
   void WReleased();
 
@@ -195,6 +200,9 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void SpacePressed();
   void SpaceReleased();
 
+  UFUNCTION(Server, Reliable, WithValidation)
+  void Server_SetKey(const EKey Key, const bool bIsPressed);
+
   FVector2D MouseInput;
   TMap<EMouse, bool> MouseMap;
   void MouseLeftPressed();
@@ -203,6 +211,11 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void MouseRightReleased();
   void MouseUpDown(const float AxisValue);
   void MouseRightLeft(const float AxisValue);
+
+  UFUNCTION(Server, Reliable, WithValidation)
+  void Server_SetMouse(const EMouse Key, const bool bIsPressed);
+  UFUNCTION(Server, Reliable, WithValidation)
+  void Server_SetMouseInput(const FVector2D NewMouseInput);
   //******** PLAYER INPUT ********
 
   //******** COLLISION ********
@@ -216,6 +229,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COLLISION ********
 
   //******** TICK FUNCTIONS ********
+  void Local_LookAround();
   void LookAround();
   void MoveAround();
   void Jump();
