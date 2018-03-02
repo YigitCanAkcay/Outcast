@@ -102,6 +102,14 @@ AOutcastCharacter::AOutcastCharacter()
 
   bReplicates        = true;
   bReplicateMovement = true;
+
+  // Sounds
+  static ConstructorHelpers::FObjectFinder<USoundWave> Hit(TEXT("SoundWave'/Game/Audio/Hit.Hit'"));
+  if (Hit.Succeeded())
+  {
+    UE_LOG(LogTemp, Warning, TEXT("FOUND!"));
+    HitSound = Hit.Object;
+  }
 }
 
 void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -247,6 +255,12 @@ void AOutcastCharacter::BodyOverlapBegin(
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
       }
+
+      if (HitSound)
+      {
+        UE_LOG(LogTemp, Warning, TEXT("OKAY!"));
+        UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSound, GetActorLocation(), 1.0f, 1.0f, 0.0f);
+      }
     }
   }
 }
@@ -269,7 +283,7 @@ void AOutcastCharacter::BodyOverlapEnd(
   }
 }
 
-void AOutcastCharacter::LookAround()
+void AOutcastCharacter::Look()
 {
   // Rotate whole Character
   CharacterRotation = GetActorRotation();
@@ -301,7 +315,7 @@ void AOutcastCharacter::LookAround()
   }
 }
 
-void AOutcastCharacter::MoveAround()
+void AOutcastCharacter::Walk()
 {
   Direction = FVector(0.0f, 0.0f, 0.0f);
   WalkPlayrate = 1.0f;
@@ -478,7 +492,7 @@ void AOutcastCharacter::Jump()
 }
 
 
-void AOutcastCharacter::Attack(const float DeltaTime)
+void AOutcastCharacter::DoAttack(const float DeltaTime)
 {
   if (Attacking == EAttack::Left)
   {
@@ -537,7 +551,7 @@ void AOutcastCharacter::Attack(const float DeltaTime)
   }
 }
 
-void AOutcastCharacter::Alive(const float DeltaTime)
+void AOutcastCharacter::TakeConsecutiveDamage(const float DeltaTime)
 {
   if (HasAuthority())
   {
@@ -563,6 +577,11 @@ void AOutcastCharacter::Alive(const float DeltaTime)
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
       }
+
+      if (HitSound)
+      {
+        //UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSound, GetActorLocation(), 1.0f, 1.0f, 0.0f);
+      }
     }
   }
 }
@@ -571,15 +590,15 @@ void AOutcastCharacter::Tick(float DeltaTime)
 {
   Super::Tick(DeltaTime);
 
-  LookAround();
+  Look();
 
-  MoveAround();
+  Walk();
 
   Jump();
 
-  Attack(DeltaTime);
+  DoAttack(DeltaTime);
 
-  Alive(DeltaTime);
+  TakeConsecutiveDamage(DeltaTime);
 
   if (HasAuthority())
   {

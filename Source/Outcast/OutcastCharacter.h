@@ -13,6 +13,7 @@
 #include "Runtime/Engine/Classes/Engine/SkeletalMeshSocket.h"
 #include "Net/UnrealNetwork.h"
 #include "Blueprint/UserWidget.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "OutcastAnimInstance.h"
 
@@ -107,23 +108,27 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** COMPONENTS ********
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
-    USkeletalMeshComponent* Body;
+  USkeletalMeshComponent* Body;
   UPROPERTY(VisibleAnywhere, Category = StaticMesh)
-    UStaticMeshComponent* Weapon;
+  UStaticMeshComponent* Weapon;
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
-    USkeletalMeshComponent* Eye_R;
+  USkeletalMeshComponent* Eye_R;
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
-    USkeletalMeshComponent* Eye_L;
+  USkeletalMeshComponent* Eye_L;
   UPROPERTY(VisibleAnywhere, Category = SkeletalMesh)
-    USkeletalMeshComponent* Armor;
+  USkeletalMeshComponent* Armor;
 
   UCapsuleComponent* Capsule;
 
   UPROPERTY(VisibleAnywhere, Category = Camera)
-    UCameraComponent* Camera;
+  UCameraComponent* Camera;
 
   UCharacterMovementComponent* Movement;
   //******** COMPONENTS ********
+
+  //******** ASSETS ********
+  USoundWave* HitSound;
+  //******** ASSETS ********
 
   APlayerController* MyPlayerController;
 
@@ -239,11 +244,11 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COLLISION ********
 
   //******** TICK FUNCTIONS ********
-  void LookAround();
-  void MoveAround();
+  void Look();
+  void Walk();
   void Jump();
-  void Attack(const float DeltaTime);
-  void Alive(const float DeltaTime);
+  void DoAttack(const float DeltaTime);
+  void TakeConsecutiveDamage(const float DeltaTime);
   //******** TICK FUNCTIONS ********
 
 public:
