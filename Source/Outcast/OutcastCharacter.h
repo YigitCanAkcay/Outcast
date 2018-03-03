@@ -16,6 +16,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Runtime/Core/Public/Misc/DateTime.h"
 
+#include "GameFramework/GameStateBase.h"
+#include "GameFramework/PlayerState.h"
+
 #include "OutcastAnimInstance.h"
 
 #include "OutcastCharacter.generated.h"
@@ -56,35 +59,33 @@ enum class EMouse
 };
 
 USTRUCT()
-struct FReplicatedData
+struct FMove
 {
   GENERATED_BODY()
 
-  UPROPERTY()
-  EJump Jumping;
-  UPROPERTY()
-  int Health;
-  UPROPERTY()
-  FVector CharacterRotation;
-  UPROPERTY()
-  FVector CharacterLocation;
-};
-
-USTRUCT()
-struct FReplicatedAnimData
-{
-  GENERATED_BODY()
+  FMove() 
+    : 
+    DeltaTime(0.0f),
+    TimeStamp(0.0f), 
+    ForwardDirection(0.0f), 
+    SidewardDirection(0.0f),
+    Acceleration(0.0f)
+  {}
 
   UPROPERTY()
-  float Speed;
+  float DeltaTime;
+
   UPROPERTY()
-  float WalkPlayrate;
+  float TimeStamp;
+
   UPROPERTY()
-  FVector LegsRotation;
+  float ForwardDirection;
+  
   UPROPERTY()
-  FVector TorsoRotation;
+  float SidewardDirection;
+
   UPROPERTY()
-  EAttack Attacking;
+  float Acceleration;
 };
 
 USTRUCT()
@@ -93,28 +94,13 @@ struct FState
   GENERATED_BODY()
 
   UPROPERTY()
-  FReplicatedData Data;
+  FVector Location;
+  
+  UPROPERTY()
+  FVector Rotation;
 
   UPROPERTY()
-  FReplicatedAnimData AnimData;
-};
-
-USTRUCT()
-struct FMove
-{
-  GENERATED_BODY()
-
-  UPROPERTY()
-  TArray<bool> KeyMap;
-
-  UPROPERTY()
-  TArray<bool> MouseMap;
-
-  UPROPERTY()
-  FVector2D MouseInput;
-
-  UPROPERTY()
-  FDateTime Time;
+  float TimeStamp;
 };
 
 UCLASS()
@@ -176,23 +162,21 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ANIMATION ********
 
   //******** REPLICATION ********
-  UPROPERTY(ReplicatedUsing = OnRep_ApplyState)
-  FState CurrentState;
-  void ExtractState();
+  UPROPERTY(ReplicatedUsing = OnRep_ServerState)
+  FState ServerState;
   UFUNCTION()
-  void OnRep_ApplyState();
-  void CreateState();
+  void OnRep_ServerState();
+  FState CreateState(const float TimeStamp);
 
-  UPROPERTY(ReplicatedUsing = OnRep_LastMove)
-  FMove LastMove;
-  UFUNCTION()
-  void OnRep_LastMove();
+  TArray<FState> ServerStates;
 
-  FMove CurrentMove;
-  TArray<FMove> MoveList;
-  void CleanMoveList();
-  void ReplayMoves();
-  void AddCurrentMove();
+  FMove CreateMove(const float DeltaTime);
+  UFUNCTION(Server, Reliable, WithValidation)
+  void Server_SendMove(const FMove Move);
+
+  TArray<FMove> UnacknowledgedMoves;
+  void CleanUnacknowledgedMoves();
+  void ReconcileWithServer();
   //******** REPLICATION ********
 
   //******** HELPERS ********
@@ -201,6 +185,17 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** HELPERS ********
 
   //******** BASIC MOVEMENT ********
+  float ForwardDirection;
+  float SidewardDirection;
+  int Acceleration;
+  int MaxWalkSpeed;
+
+  void RegulateAcceleration();
+  void SimulateMovement(const FMove& Move);
+
+  void MoveForward(const float AxisValue);
+  void MoveRight(const float AxisValue);
+
   float Speed;
   const float MaxSpeed = 100.0f;
   const float MinSpeed = 0.0f;
@@ -225,7 +220,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** ATTACKING ********
   UFUNCTION(BlueprintCallable)
-  int GetHealth();
+    int GetHealth();
 
   TMap<AOutcastCharacter*, float> DamageTakenBy;
 
@@ -249,7 +244,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ATTACKING ********
 
   //******** PLAYER INPUT ********
-  //TMap<EKey, bool> KeyMap;
   TArray<bool> KeyMap;
   bool GetKeyPressed(const EKey Key);
   void SetKeyPressed(const EKey Key, const bool bValue);
@@ -268,11 +262,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void SpacePressed();
   void SpaceReleased();
 
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetKey(const EKey Key, const bool bIsPressed);
-
   FVector2D MouseInput;
-  //TMap<EMouse, bool> MouseMap;
   TArray<bool> MouseMap;
   bool GetMousePressed(const EMouse MouseKey);
   void SetMousePressed(const EMouse MouseKey, const bool bIsPressed);
@@ -282,11 +272,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void MouseRightReleased();
   void MouseUpDown(const float AxisValue);
   void MouseRightLeft(const float AxisValue);
-
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetMouse(const EMouse Key, const bool bIsPressed);
-  UFUNCTION(Server, Reliable, WithValidation)
-  void Server_SetMouseInput(const FVector2D NewMouseInput);
   //******** PLAYER INPUT ********
 
   //******** COLLISION ********
@@ -322,6 +307,5 @@ public:
 
   EAttack GetAttack();
 
-	virtual void SetupPlayerInputComponent(
-    class UInputComponent* PlayerInputComponent) override;
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 };

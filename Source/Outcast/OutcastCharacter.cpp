@@ -6,6 +6,12 @@
 
 AOutcastCharacter::AOutcastCharacter()
   :
+  ServerState(),
+  ForwardDirection(0.0f),
+  SidewardDirection(0.0f),
+  Acceleration(0.0f),
+  MaxWalkSpeed(10),
+
   Speed(0.0f),
   Direction(FVector()),
   WalkPlayrate(1.0f),
@@ -26,11 +32,6 @@ AOutcastCharacter::AOutcastCharacter()
   // Initialize KeyMap
   // Since TMaps can't be replicated a TArray will be used instead
   // pre initialized with 5 elements so that EKey can be used to index
-  /*KeyMap.Add(EKey::W, false);
-  KeyMap.Add(EKey::A, false);
-  KeyMap.Add(EKey::S, false);
-  KeyMap.Add(EKey::D, false);
-  KeyMap.Add(EKey::Space, false);*/
   KeyMap.Add(false);
   KeyMap.Add(false);
   KeyMap.Add(false);
@@ -39,8 +40,6 @@ AOutcastCharacter::AOutcastCharacter()
 
   // Initialize Mouse Input
   // See comment above on KeyMap
-  /*MouseMap.Add(EMouse::Left, false);
-  MouseMap.Add(EMouse::Right, false);*/
   MouseMap.Add(false);
   MouseMap.Add(false);
 
@@ -110,8 +109,11 @@ AOutcastCharacter::AOutcastCharacter()
   bUseControllerRotationPitch = false;
   bUseControllerRotationRoll  = false;
 
-  bReplicates        = true;
-  bReplicateMovement = true;
+  if (HasAuthority())
+  {
+    bReplicates        = true;
+    bReplicateMovement = false;
+  }
   
   // Sounds
   static ConstructorHelpers::FObjectFinder<USoundAttenuation> Atten(TEXT("SoundAttenuation'/Game/Audio/Distance.Distance'"));
@@ -267,8 +269,7 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-  DOREPLIFETIME(AOutcastCharacter, CurrentState);
-  DOREPLIFETIME(AOutcastCharacter, LastMove);
+  DOREPLIFETIME(AOutcastCharacter, ServerState);
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -309,92 +310,85 @@ void AOutcastCharacter::BeginPlay()
   }
 }
 
-void AOutcastCharacter::ExtractState()
+void AOutcastCharacter::OnRep_ServerState()
 {
-  Jumping           = CurrentState.Data.Jumping;
-  CharacterLocation = CurrentState.Data.CharacterLocation;
-  CharacterRotation = ReturnFRotator(CurrentState.Data.CharacterRotation);
-  Health            = CurrentState.Data.Health;
-
-  Speed         = CurrentState.AnimData.Speed;
-  WalkPlayrate  = CurrentState.AnimData.WalkPlayrate;
-  LegsRotation  = ReturnFRotator(CurrentState.AnimData.LegsRotation);
-  TorsoRotation = ReturnFRotator(CurrentState.AnimData.TorsoRotation);
-  Attacking     = CurrentState.AnimData.Attacking;
+  SetActorLocation(ServerState.Location);
+  SetActorRotation(ReturnFRotator(ServerState.Rotation));
+  
+  CleanUnacknowledgedMoves();
+  ReconcileWithServer();
 }
 
-void AOutcastCharacter::OnRep_ApplyState()
+FState AOutcastCharacter::CreateState(const float TimeStamp)
 {
-  ExtractState();
+  FState NewState;
 
-  SetActorRotation(CharacterRotation);
-  SetActorLocation(CharacterLocation);
+  NewState.Location  = GetActorLocation();
+  NewState.Rotation  = ReturnFVector(GetActorRotation());
+  NewState.TimeStamp = TimeStamp;
 
-  if (Anim)
+  return NewState;
+}
+
+FMove AOutcastCharacter::CreateMove(const float DeltaTime)
+{
+  FMove NewMove;
+
+  NewMove.DeltaTime         = DeltaTime;
+  NewMove.TimeStamp         = GetWorld()->TimeSeconds;
+  NewMove.ForwardDirection  = ForwardDirection;
+  NewMove.SidewardDirection = SidewardDirection;
+  NewMove.Acceleration      = Acceleration;
+
+  if (!HasAuthority())
   {
-    Anim->SetIsJumping(Jumping != EJump::NONE);
-    Anim->SetAcceleration(Speed);
-    Anim->SetWalkPlayrate(WalkPlayrate);
-    Anim->SetLegsRotation(LegsRotation);
-    Anim->SetTorsoRotation(TorsoRotation);
-    Anim->SetIsSlashingLeft(Attacking == EAttack::Left);
-    Anim->SetIsSlashingRight(Attacking == EAttack::Right);
-    Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
+    UnacknowledgedMoves.Add(NewMove);
+  }
+
+  return NewMove;
+}
+
+void AOutcastCharacter::Server_SendMove_Implementation(const FMove Move)
+{
+  SimulateMovement(Move);
+
+  ServerStates.Add(CreateState(Move.TimeStamp));
+
+  if (ServerStates.Num() > 100)
+  {
+    ServerState = ServerStates.Last();
+    ServerStates.Empty();
   }
 }
 
-void AOutcastCharacter::CreateState()
+bool AOutcastCharacter::Server_SendMove_Validate(const FMove Move)
 {
-  CurrentState.Data.Jumping           = Jumping;
-  CurrentState.Data.CharacterLocation = CharacterLocation;
-  CurrentState.Data.CharacterRotation = ReturnFVector(CharacterRotation);
-  CurrentState.Data.Health            = Health;
-
-  CurrentState.AnimData.Speed         = Speed;
-  CurrentState.AnimData.WalkPlayrate  = WalkPlayrate;
-  CurrentState.AnimData.LegsRotation  = ReturnFVector(LegsRotation);
-  CurrentState.AnimData.TorsoRotation = ReturnFVector(TorsoRotation);
-  CurrentState.AnimData.Attacking     = Attacking;
+  return true;
 }
 
-void AOutcastCharacter::OnRep_LastMove()
+void AOutcastCharacter::CleanUnacknowledgedMoves()
 {
-  CleanMoveList();
-  ReplayMoves();
-}
+  TArray<FMove> NewList;
 
-void AOutcastCharacter::CleanMoveList()
-{}
-
-void AOutcastCharacter::ReplayMoves()
-{
-  if (MoveList.Num() > 0)
+  for (const FMove& Move : UnacknowledgedMoves)
   {
-    UE_LOG(LogTemp, Warning, TEXT("%s %s"), *LastMove.Time.ToString(), *MoveList.Last().Time.ToString());
-  }
-}
-
-void AOutcastCharacter::AddCurrentMove()
-{
-  //TArray<bool> KeyArray;
-  //TArray<bool> MouseArray;
-  //KeyMap.GenerateValueArray(KeyArray);
-  //MouseMap.GenerateValueArray(MouseArray);
-  if ( KeyMap.Contains(true)
-    || MouseMap.Contains(true)
-    || MouseInput.X != 0
-    || MouseInput.Y != 0)
-  {
-    CurrentMove.KeyMap     = KeyMap;
-    CurrentMove.MouseMap   = MouseMap;
-    CurrentMove.MouseInput = MouseInput;
-    CurrentMove.Time       = FDateTime::Now();
-
-    if (IsLocallyControlled() && !HasAuthority())
+    if (Move.TimeStamp > ServerState.TimeStamp)
     {
-      MoveList.Add(CurrentMove);
+      NewList.Add(Move);
     }
   }
+
+  UnacknowledgedMoves = NewList;
+}
+
+void AOutcastCharacter::ReconcileWithServer()
+{
+  for (const FMove& Move : UnacknowledgedMoves)
+  {
+    SimulateMovement(Move);
+  }
+
+  UnacknowledgedMoves.Empty();
 }
 
 FVector AOutcastCharacter::ReturnFVector(const FRotator& Rotator)
@@ -468,6 +462,7 @@ void AOutcastCharacter::BodyOverlapBegin(
   bool bFromSweep,
   const FHitResult& SweepResult)
 {
+  /*
   // Other Actor is the actor that triggered the event. Check that is not ourself.  
   if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
@@ -489,7 +484,7 @@ void AOutcastCharacter::BodyOverlapBegin(
       }
       PlayHitVocalSound();
     }
-  }
+  }*/
 }
 
 void AOutcastCharacter::BodyOverlapEnd(
@@ -498,6 +493,7 @@ void AOutcastCharacter::BodyOverlapEnd(
   UPrimitiveComponent* OtherComp,
   int32 OtherBodyIndex)
 {
+  /*
   // Other Actor is the actor that triggered the event. Check that is not ourself.  
   if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
@@ -507,7 +503,7 @@ void AOutcastCharacter::BodyOverlapEnd(
     {
       DamageTakenBy.Remove(AttackingCharacter);
     }
-  }
+  }*/
 }
 
 void AOutcastCharacter::Look()
@@ -544,6 +540,7 @@ void AOutcastCharacter::Look()
 
 void AOutcastCharacter::Walk()
 {
+  /*
   Direction = FVector(0.0f, 0.0f, 0.0f);
   WalkPlayrate = 1.0f;
 
@@ -641,7 +638,8 @@ void AOutcastCharacter::Walk()
   {
     if (Jumping == EJump::NONE)
     {
-      AddMovementInput(Direction, Speed / 5);
+      //AddMovementInput(Direction, Speed / 5);
+      Capsule->AddWorldOffset(Direction * (Speed / 5), true);
     }
     else if (Jumping == EJump::BunnyHop)
     {
@@ -656,12 +654,12 @@ void AOutcastCharacter::Walk()
   if (HasAuthority())
   {
     CharacterLocation = GetActorLocation();
-  }
+  }*/
 }
 
 void AOutcastCharacter::Jump()
 {
-  if (GetKeyPressed(EKey::Space))
+  /*if (GetKeyPressed(EKey::Space))
   {
     if (Jumping != EJump::BunnyHop)
     {
@@ -715,6 +713,7 @@ void AOutcastCharacter::Jump()
       BunnyHopSpeedRatio = DefaultJumpSpeedRatio;
     }
   }
+  */
 }
 
 
@@ -806,26 +805,52 @@ void AOutcastCharacter::TakeConsecutiveDamage(const float DeltaTime)
   }
 }
 
+void AOutcastCharacter::RegulateAcceleration()
+{
+  if ( ForwardDirection != 0.0f
+    || SidewardDirection != 0.0f)
+  {
+    Acceleration = FMath::Clamp(Acceleration + 2, 0, 100);
+  }
+  else
+  {
+    Acceleration = FMath::Clamp(Acceleration - 2, 0, 100);
+  }
+}
+
+void AOutcastCharacter::SimulateMovement(const FMove& Move)
+{
+  Capsule->AddWorldOffset(GetActorForwardVector() * Move.ForwardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
+  Capsule->AddWorldOffset(GetActorRightVector() * Move.SidewardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
+
+  // Gravity
+  Capsule->AddWorldOffset(GetActorUpVector() * -1 * 990 * Move.DeltaTime, true);
+}
+
 void AOutcastCharacter::Tick(float DeltaTime)
 {
   Super::Tick(DeltaTime);
 
-  Look();
-
-  Walk();
-
-  Jump();
-
-  DoAttack(DeltaTime);
-
-  TakeConsecutiveDamage(DeltaTime);
-
-  AddCurrentMove();
-
-  if (HasAuthority())
+  if (IsLocallyControlled())
   {
-    CreateState();
-    LastMove = CurrentMove;
+    // Regulate it before (or after) creating the move and simulating
+    // it, but not in between.
+    RegulateAcceleration();
+
+    FMove Move = CreateMove(DeltaTime);
+
+    SimulateMovement(Move);
+
+    if (HasAuthority())
+    {
+      ServerState = CreateState(Move.TimeStamp);
+    }
+    else
+    {
+      Server_SendMove(Move);
+
+      //UE_LOG(LogTemp, Warning, TEXT("%d"), UnacknowledgedMoves.Num());
+    }
   }
 }
 
@@ -844,7 +869,7 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
   // Keyboard input
-  PlayerInputComponent->BindAction(
+  /*PlayerInputComponent->BindAction(
     "W",
     IE_Pressed,
     this,
@@ -897,7 +922,7 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     "Space",
     IE_Released,
     this,
-    &AOutcastCharacter::SpaceReleased);
+    &AOutcastCharacter::SpaceReleased);*/
 
   // Mouse input
   PlayerInputComponent->BindAction(
@@ -930,6 +955,15 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     "MouseRightLeft",
     this,
     &AOutcastCharacter::MouseRightLeft);
+
+  PlayerInputComponent->BindAxis(
+    "MoveForward",
+    this,
+    &AOutcastCharacter::MoveForward);
+  PlayerInputComponent->BindAxis(
+    "MoveRight",
+    this,
+    &AOutcastCharacter::MoveRight);
 }
 
 bool AOutcastCharacter::GetKeyPressed(const EKey Key)
@@ -942,85 +976,64 @@ void AOutcastCharacter::SetKeyPressed(const EKey Key, const bool bValue)
   KeyMap[static_cast<int>(Key)] = bValue;
 }
 
+void AOutcastCharacter::MoveForward(const float AxisValue)
+{
+  ForwardDirection = AxisValue;
+}
+
+void AOutcastCharacter::MoveRight(const float AxisValue)
+{
+  SidewardDirection = AxisValue;
+}
+
 void AOutcastCharacter::WPressed()
 {
-  //KeyMap.Add(EKey::W, true);
   SetKeyPressed(EKey::W, true);
-  Server_SetKey(EKey::W, true);
 }
 
 void AOutcastCharacter::WReleased()
 {
-  //KeyMap.Add(EKey::W, false);
   SetKeyPressed(EKey::W, false);
-  Server_SetKey(EKey::W, false);
 }
 
 void AOutcastCharacter::APressed()
 {
-  //KeyMap.Add(EKey::A, true);
   SetKeyPressed(EKey::A, true);
-  Server_SetKey(EKey::A, true);
 }
 
 void AOutcastCharacter::AReleased()
 {
-  //KeyMap.Add(EKey::A, false);
   SetKeyPressed(EKey::A, false);
-  Server_SetKey(EKey::A, false);
 }
 
 void AOutcastCharacter::SPressed()
 {
-  //KeyMap.Add(EKey::S, true);
   SetKeyPressed(EKey::S, true);
-  Server_SetKey(EKey::S, true);
 }
 
 void AOutcastCharacter::SReleased()
 {
-  //KeyMap.Add(EKey::S, false);
   SetKeyPressed(EKey::S, false);
-  Server_SetKey(EKey::S, false);
 }
 
 void AOutcastCharacter::DPressed()
 {
-  //KeyMap.Add(EKey::D, true);
   SetKeyPressed(EKey::D, true);
-  Server_SetKey(EKey::D, true);
 }
 
 void AOutcastCharacter::DReleased()
 {
-  //KeyMap.Add(EKey::D, false);
   SetKeyPressed(EKey::D, false);
-  Server_SetKey(EKey::D, false);
 }
 
 void AOutcastCharacter::SpacePressed()
 {
-  //KeyMap.Add(EKey::Space, true);
   SetKeyPressed(EKey::Space, true);
-  Server_SetKey(EKey::Space, true);
 }
 
 void AOutcastCharacter::SpaceReleased()
 {
-  //KeyMap.Add(EKey::Space, false);
   SetKeyPressed(EKey::Space, false);
-  Server_SetKey(EKey::Space, false);
-}
-
-void AOutcastCharacter::Server_SetKey_Implementation(const EKey Key, const bool bIsPressed)
-{
-  //KeyMap.Add(Key, bIsPressed);
-  SetKeyPressed(Key, bIsPressed);
-}
-
-bool AOutcastCharacter::Server_SetKey_Validate(const EKey Key, const bool bIsPressed)
-{
-  return true;
 }
 
 bool AOutcastCharacter::GetMousePressed(const EMouse MouseKey)
@@ -1036,58 +1049,31 @@ void AOutcastCharacter::SetMousePressed(const EMouse MouseKey, const bool bIsPre
 void AOutcastCharacter::MouseLeftPressed()
 {
   SetMousePressed(EMouse::Left, true);
-  Server_SetMouse(EMouse::Left, true);
 }
 
 void AOutcastCharacter::MouseRightPressed()
 {
   SetMousePressed(EMouse::Right, true);
-  Server_SetMouse(EMouse::Right, true);
 }
 
 void AOutcastCharacter::MouseLeftReleased()
 {
   SetMousePressed(EMouse::Left, false);
-  Server_SetMouse(EMouse::Left, false);
 }
 
 void AOutcastCharacter::MouseRightReleased()
 {
   SetMousePressed(EMouse::Right, false);
-  Server_SetMouse(EMouse::Right, false);
 }
 
 void AOutcastCharacter::MouseUpDown(const float AxisValue)
 {
   MouseInput.Y = AxisValue;
-  Server_SetMouseInput(MouseInput);
 }
 
 void AOutcastCharacter::MouseRightLeft(const float AxisValue)
 {
   MouseInput.X = AxisValue;
-  Server_SetMouseInput(MouseInput);
-}
-
-void AOutcastCharacter::Server_SetMouse_Implementation(const EMouse Key, const bool bIsPressed)
-{
-  //MouseMap.Add(Key, bIsPressed);
-  SetMousePressed(Key, bIsPressed);
-}
-
-bool AOutcastCharacter::Server_SetMouse_Validate(const EMouse Key, const bool bIsPressed)
-{
-  return true;
-}
-
-void AOutcastCharacter::Server_SetMouseInput_Implementation(const FVector2D NewMouseInput)
-{
-  MouseInput = NewMouseInput;
-}
-
-bool AOutcastCharacter::Server_SetMouseInput_Validate(const FVector2D NewMouseInput)
-{
-  return true;
 }
 
 void AOutcastCharacter::OnHit(
@@ -1097,6 +1083,7 @@ void AOutcastCharacter::OnHit(
   FVector NormalImpulse,
   const FHitResult& Hit)
 {
+  /*
   // Character is on top of a walkable plane
   if (OtherActor->ActorHasTag(FName("Walkable")))
   {
@@ -1118,5 +1105,5 @@ void AOutcastCharacter::OnHit(
 
     PlayStepSound();
     Anim->SetIsJumping(false);
-  }
+  }*/
 }
