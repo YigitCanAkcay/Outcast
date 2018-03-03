@@ -41,18 +41,18 @@ enum class EAttack
 UENUM()
 enum class EKey
 {
-  W,
-  A,
-  S,
-  D,
-  Space
+  W     = 0,
+  A     = 1,
+  S     = 2,
+  D     = 3,
+  Space = 4
 };
 
 UENUM()
 enum class EMouse
 {
-  Left,
-  Right
+  Left  = 0,
+  Right = 1
 };
 
 USTRUCT()
@@ -105,10 +105,10 @@ struct FMove
   GENERATED_BODY()
 
   UPROPERTY()
-  TMap<EKey, bool> KeyMap;
+  TArray<bool> KeyMap;
 
   UPROPERTY()
-  TMap<EMouse, bool> MouseMap;
+  TArray<bool> MouseMap;
 
   UPROPERTY()
   FVector2D MouseInput;
@@ -143,6 +143,10 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COMPONENTS ********
 
   //******** ASSETS ********
+  TArray<USoundWave*> AttackSounds;
+  TArray<USoundWave*> HitSounds;
+  TArray<USoundWave*> HitVocalSounds;
+  USoundWave* IdleHitSound;
   TArray<USoundWave*> StepSounds;
   TArray<USoundWave*> JumpVocalSounds;
   TArray<USoundWave*> AttackVocalSounds;
@@ -153,6 +157,14 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void PlayJumpVocalSound();
   UFUNCTION(BlueprintCallable)
   void PlayAttackVocalSound();
+  UFUNCTION(BlueprintCallable)
+  void PlayAttackSound();
+  UFUNCTION(BlueprintCallable)
+  void PlayHitSound();
+  UFUNCTION(BlueprintCallable)
+  void PlayHitVocalSound();
+  UFUNCTION(BlueprintCallable)
+  void PlayIdleHitSound();
 
   USoundAttenuation* Attenuation;
   //******** ASSETS ********
@@ -175,6 +187,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   FMove LastMove;
   UFUNCTION()
   void OnRep_LastMove();
+
+  FMove CurrentMove;
   TArray<FMove> MoveList;
   void CleanMoveList();
   void ReplayMoves();
@@ -235,7 +249,10 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ATTACKING ********
 
   //******** PLAYER INPUT ********
-  TMap<EKey, bool> KeyMap;
+  //TMap<EKey, bool> KeyMap;
+  TArray<bool> KeyMap;
+  bool GetKeyPressed(const EKey Key);
+  void SetKeyPressed(const EKey Key, const bool bValue);
   void WPressed();
   void WReleased();
 
@@ -255,7 +272,10 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void Server_SetKey(const EKey Key, const bool bIsPressed);
 
   FVector2D MouseInput;
-  TMap<EMouse, bool> MouseMap;
+  //TMap<EMouse, bool> MouseMap;
+  TArray<bool> MouseMap;
+  bool GetMousePressed(const EMouse MouseKey);
+  void SetMousePressed(const EMouse MouseKey, const bool bIsPressed);
   void MouseLeftPressed();
   void MouseRightPressed();
   void MouseLeftReleased();

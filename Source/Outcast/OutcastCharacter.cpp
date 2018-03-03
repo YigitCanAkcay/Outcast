@@ -24,15 +24,25 @@ AOutcastCharacter::AOutcastCharacter()
  	PrimaryActorTick.bCanEverTick = true;
 
   // Initialize KeyMap
-  KeyMap.Add(EKey::W, false);
+  // Since TMaps can't be replicated a TArray will be used instead
+  // pre initialized with 5 elements so that EKey can be used to index
+  /*KeyMap.Add(EKey::W, false);
   KeyMap.Add(EKey::A, false);
   KeyMap.Add(EKey::S, false);
   KeyMap.Add(EKey::D, false);
-  KeyMap.Add(EKey::Space, false);
+  KeyMap.Add(EKey::Space, false);*/
+  KeyMap.Add(false);
+  KeyMap.Add(false);
+  KeyMap.Add(false);
+  KeyMap.Add(false);
+  KeyMap.Add(false);
 
   // Initialize Mouse Input
-  MouseMap.Add(EMouse::Left, false);
-  MouseMap.Add(EMouse::Right, false);
+  // See comment above on KeyMap
+  /*MouseMap.Add(EMouse::Left, false);
+  MouseMap.Add(EMouse::Right, false);*/
+  MouseMap.Add(false);
+  MouseMap.Add(false);
 
   static ConstructorHelpers::FObjectFinder<USkeletalMesh> BodyMesh(TEXT("SkeletalMesh'/Game/Feline_Warrior/Meshes/SK_Cat_Warrior.SK_Cat_Warrior'"));
   if (BodyMesh.Succeeded())
@@ -217,6 +227,40 @@ AOutcastCharacter::AOutcastCharacter()
   {
     AttackVocalSounds.Add(AttackVocal4.Object);
   }
+
+  static ConstructorHelpers::FObjectFinder<USoundWave> Attack1(TEXT("SoundWave'/Game/Audio/Attacking/Attack1.Attack1'"));
+  if (Attack1.Succeeded())
+  {
+    AttackSounds.Add(Attack1.Object);
+  }
+
+  static ConstructorHelpers::FObjectFinder<USoundWave> Hit(TEXT("SoundWave'/Game/Audio/Hit/Hit.Hit'"));
+  if (Hit.Succeeded())
+  {
+    HitSounds.Add(Hit.Object);
+  }
+
+  static ConstructorHelpers::FObjectFinder<USoundWave> HitVocal1(TEXT("SoundWave'/Game/Audio/Hit/Vocals/Hit1.Hit1'"));
+  if (HitVocal1.Succeeded())
+  {
+    HitVocalSounds.Add(HitVocal1.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> HitVocal2(TEXT("SoundWave'/Game/Audio/Hit/Vocals/Hit2.Hit2'"));
+  if (HitVocal2.Succeeded())
+  {
+    HitVocalSounds.Add(HitVocal2.Object);
+  }
+  static ConstructorHelpers::FObjectFinder<USoundWave> HitVocal3(TEXT("SoundWave'/Game/Audio/Hit/Vocals/Hit3.Hit3'"));
+  if (HitVocal3.Succeeded())
+  {
+    HitVocalSounds.Add(HitVocal3.Object);
+  }
+
+  static ConstructorHelpers::FObjectFinder<USoundWave> IdleHit(TEXT("SoundWave'/Game/Audio/Hit/IdleHit.IdleHit'"));
+  if (IdleHit.Succeeded())
+  {
+    IdleHitSound = IdleHit.Object;
+  }
 }
 
 void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -224,6 +268,7 @@ void AOutcastCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
   DOREPLIFETIME(AOutcastCharacter, CurrentState);
+  DOREPLIFETIME(AOutcastCharacter, LastMove);
 }
 
 void AOutcastCharacter::BeginPlay()
@@ -322,25 +367,33 @@ void AOutcastCharacter::CleanMoveList()
 {}
 
 void AOutcastCharacter::ReplayMoves()
-{}
+{
+  if (MoveList.Num() > 0)
+  {
+    UE_LOG(LogTemp, Warning, TEXT("%s %s"), *LastMove.Time.ToString(), *MoveList.Last().Time.ToString());
+  }
+}
 
 void AOutcastCharacter::AddCurrentMove()
 {
-  TArray<bool> KeyArray;
-  TArray<bool> MouseArray;
-  KeyMap.GenerateValueArray(KeyArray);
-  MouseMap.GenerateValueArray(MouseArray);
-  if (KeyArray.Contains(true)
-    || MouseArray.Contains(true)
+  //TArray<bool> KeyArray;
+  //TArray<bool> MouseArray;
+  //KeyMap.GenerateValueArray(KeyArray);
+  //MouseMap.GenerateValueArray(MouseArray);
+  if ( KeyMap.Contains(true)
+    || MouseMap.Contains(true)
     || MouseInput.X != 0
     || MouseInput.Y != 0)
   {
-    FMove CurrentMove;
     CurrentMove.KeyMap     = KeyMap;
     CurrentMove.MouseMap   = MouseMap;
     CurrentMove.MouseInput = MouseInput;
     CurrentMove.Time       = FDateTime::Now();
-    MoveList.Add(CurrentMove);
+
+    if (IsLocallyControlled() && !HasAuthority())
+    {
+      MoveList.Add(CurrentMove);
+    }
   }
 }
 
@@ -368,20 +421,43 @@ int AOutcastCharacter::GetHealth()
 
 void AOutcastCharacter::PlayStepSound()
 {
-  int Random = FMath::RandRange(0, 7);
+  int Random = FMath::RandRange(0, StepSounds.Num() - 1);
   UGameplayStatics::PlaySoundAtLocation(GetWorld(), StepSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
 }
 
 void AOutcastCharacter::PlayJumpVocalSound()
 {
-  int Random = FMath::RandRange(0, 8);
+  int Random = FMath::RandRange(0, JumpVocalSounds.Num() - 1);
   UGameplayStatics::PlaySoundAtLocation(GetWorld(), JumpVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
 }
 
 void AOutcastCharacter::PlayAttackVocalSound()
 {
-  int Random = FMath::RandRange(0, 3);
+  int Random = FMath::RandRange(0, AttackVocalSounds.Num() - 1);
   UGameplayStatics::PlaySoundAtLocation(GetWorld(), AttackVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+}
+
+void AOutcastCharacter::PlayAttackSound()
+{
+  int Random = 0;//FMath::RandRange(0, 0);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), AttackSounds[Random], GetActorLocation(), 0.35f, 1.0f, 0.0f, Attenuation);
+}
+
+void AOutcastCharacter::PlayHitSound()
+{
+  int Random = 0;// FMath::RandRange(0, 3);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+}
+
+void AOutcastCharacter::PlayHitVocalSound()
+{
+  int Random = FMath::RandRange(0, HitVocalSounds.Num() - 1);
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+}
+
+void AOutcastCharacter::PlayIdleHitSound()
+{
+  UGameplayStatics::PlaySoundAtLocation(GetWorld(), IdleHitSound, GetActorLocation(), 0.5f, 1.0f, 0.0f, Attenuation);
 }
 
 void AOutcastCharacter::BodyOverlapBegin(
@@ -404,16 +480,14 @@ void AOutcastCharacter::BodyOverlapBegin(
       if (AttackingCharacter->GetAttack() == EAttack::NONE)
       {
         Health = FMath::Clamp(Health - 1, 0, 100);
+        PlayIdleHitSound();
       }
       else
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
+        PlayHitSound();
       }
-
-      /*if (HitSound && Attenuation)
-      {
-        UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSound, GetActorLocation(), 1.0f, 1.0f, 0.0f, Attenuation);
-      }*/
+      PlayHitVocalSound();
     }
   }
 }
@@ -474,25 +548,25 @@ void AOutcastCharacter::Walk()
   WalkPlayrate = 1.0f;
 
   //**** DIRECTION ****
-  if (KeyMap[EKey::W])
+  if (GetKeyPressed(EKey::W))
   {
     Direction = Direction + GetActorRotation().Vector();
   }
 
-  if (KeyMap[EKey::A])
+  if (GetKeyPressed(EKey::A))
   {
     FRotator Rot = GetActorRotation();
     Rot.Yaw = Rot.Yaw - 90.0f;
     Direction = Direction + Rot.Vector();
   }
 
-  if (KeyMap[EKey::S])
+  if (GetKeyPressed(EKey::S))
   {
     Direction = Direction + GetActorRotation().Vector() * -1;
     WalkPlayrate = -1.0f;
   }
 
-  if (KeyMap[EKey::D])
+  if (GetKeyPressed(EKey::D))
   {
     FRotator Rot = GetActorRotation();
     Rot.Yaw = Rot.Yaw + 90.0f;
@@ -501,10 +575,10 @@ void AOutcastCharacter::Walk()
   //**** DIRECTION ****
 
   //**** SPEED ****
-  if (KeyMap[EKey::W] && !KeyMap[EKey::S]
-    || KeyMap[EKey::A] && !KeyMap[EKey::D]
-    || KeyMap[EKey::S] && !KeyMap[EKey::W]
-    || KeyMap[EKey::D] && !KeyMap[EKey::A])
+  if ( GetKeyPressed(EKey::W) && !GetKeyPressed(EKey::S)
+    || GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D)
+    || GetKeyPressed(EKey::S) && !GetKeyPressed(EKey::W)
+    || GetKeyPressed(EKey::D) && !GetKeyPressed(EKey::A))
   {
     Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
   }
@@ -523,35 +597,35 @@ void AOutcastCharacter::Walk()
   //**** SPEED ****
 
   //**** LEGS ROTATION ****
-  if (KeyMap[EKey::W])
+  if (GetKeyPressed(EKey::W))
   {
     LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-    if (KeyMap[EKey::A])
+    if (GetKeyPressed(EKey::A))
     {
       LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
     }
-    else if (KeyMap[EKey::D])
+    else if (GetKeyPressed(EKey::D))
     {
       LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
     }
   }
-  else if (KeyMap[EKey::S])
+  else if (GetKeyPressed(EKey::S))
   {
     LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-    if (KeyMap[EKey::A])
+    if (GetKeyPressed(EKey::A))
     {
       LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
     }
-    else if (KeyMap[EKey::D])
+    else if (GetKeyPressed(EKey::D))
     {
       LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
     }
   }
-  else if (KeyMap[EKey::A] && !KeyMap[EKey::D])
+  else if (GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D))
   {
     LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
   }
-  else if (KeyMap[EKey::D] && !KeyMap[EKey::A])
+  else if (GetKeyPressed(EKey::D) && !GetKeyPressed(EKey::A))
   {
     LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
   }
@@ -587,7 +661,7 @@ void AOutcastCharacter::Walk()
 
 void AOutcastCharacter::Jump()
 {
-  if (KeyMap[EKey::Space])
+  if (GetKeyPressed(EKey::Space))
   {
     if (Jumping != EJump::BunnyHop)
     {
@@ -659,24 +733,20 @@ void AOutcastCharacter::DoAttack(const float DeltaTime)
     Attacking = Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE;
   }
 
-  if (MouseMap[EMouse::Left])
+  if (GetMousePressed(EMouse::Left))
   {
     if (Attacking == EAttack::NONE)
     {
       // Slashing left/right has priority over forward
-      if (KeyMap[EKey::A]
-        && !KeyMap[EKey::D])
+      if (GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D))
       {
         Attacking = EAttack::Left;
       }
-      else if (!KeyMap[EKey::A]
-        && KeyMap[EKey::D])
+      else if (!GetKeyPressed(EKey::A) && GetKeyPressed(EKey::D))
       {
         Attacking = EAttack::Right;
       }
-      else if (!KeyMap[EKey::A]
-        && !KeyMap[EKey::D]
-        && KeyMap[EKey::W])
+      else if (!GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D) && GetKeyPressed(EKey::W))
       {
         Attacking = EAttack::Forward;
       }
@@ -724,11 +794,14 @@ void AOutcastCharacter::TakeConsecutiveDamage(const float DeltaTime)
       if (AttackerIt->Key->GetAttack() == EAttack::NONE)
       {
         Health = FMath::Clamp(Health - 1, 0, 100);
+        PlayIdleHitSound();
       }
       else
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
+        PlayHitSound();
       }
+      PlayHitVocalSound();
     }
   }
 }
@@ -747,13 +820,12 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   TakeConsecutiveDamage(DeltaTime);
 
+  AddCurrentMove();
+
   if (HasAuthority())
   {
     CreateState();
-  }
-  else if (IsLocallyControlled())
-  {
-    AddCurrentMove();
+    LastMove = CurrentMove;
   }
 }
 
@@ -860,69 +932,90 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     &AOutcastCharacter::MouseRightLeft);
 }
 
+bool AOutcastCharacter::GetKeyPressed(const EKey Key)
+{
+  return KeyMap[static_cast<int>(Key)];
+}
+
+void AOutcastCharacter::SetKeyPressed(const EKey Key, const bool bValue)
+{
+  KeyMap[static_cast<int>(Key)] = bValue;
+}
+
 void AOutcastCharacter::WPressed()
 {
-  KeyMap.Add(EKey::W, true);
+  //KeyMap.Add(EKey::W, true);
+  SetKeyPressed(EKey::W, true);
   Server_SetKey(EKey::W, true);
 }
 
 void AOutcastCharacter::WReleased()
 {
-  KeyMap.Add(EKey::W, false);
+  //KeyMap.Add(EKey::W, false);
+  SetKeyPressed(EKey::W, false);
   Server_SetKey(EKey::W, false);
 }
 
 void AOutcastCharacter::APressed()
 {
-  KeyMap.Add(EKey::A, true);
+  //KeyMap.Add(EKey::A, true);
+  SetKeyPressed(EKey::A, true);
   Server_SetKey(EKey::A, true);
 }
 
 void AOutcastCharacter::AReleased()
 {
-  KeyMap.Add(EKey::A, false);
+  //KeyMap.Add(EKey::A, false);
+  SetKeyPressed(EKey::A, false);
   Server_SetKey(EKey::A, false);
 }
 
 void AOutcastCharacter::SPressed()
 {
-  KeyMap.Add(EKey::S, true);
+  //KeyMap.Add(EKey::S, true);
+  SetKeyPressed(EKey::S, true);
   Server_SetKey(EKey::S, true);
 }
 
 void AOutcastCharacter::SReleased()
 {
-  KeyMap.Add(EKey::S, false);
+  //KeyMap.Add(EKey::S, false);
+  SetKeyPressed(EKey::S, false);
   Server_SetKey(EKey::S, false);
 }
 
 void AOutcastCharacter::DPressed()
 {
-  KeyMap.Add(EKey::D, true);
+  //KeyMap.Add(EKey::D, true);
+  SetKeyPressed(EKey::D, true);
   Server_SetKey(EKey::D, true);
 }
 
 void AOutcastCharacter::DReleased()
 {
-  KeyMap.Add(EKey::D, false);
+  //KeyMap.Add(EKey::D, false);
+  SetKeyPressed(EKey::D, false);
   Server_SetKey(EKey::D, false);
 }
 
 void AOutcastCharacter::SpacePressed()
 {
-  KeyMap.Add(EKey::Space, true);
+  //KeyMap.Add(EKey::Space, true);
+  SetKeyPressed(EKey::Space, true);
   Server_SetKey(EKey::Space, true);
 }
 
 void AOutcastCharacter::SpaceReleased()
 {
-  KeyMap.Add(EKey::Space, false);
+  //KeyMap.Add(EKey::Space, false);
+  SetKeyPressed(EKey::Space, false);
   Server_SetKey(EKey::Space, false);
 }
 
 void AOutcastCharacter::Server_SetKey_Implementation(const EKey Key, const bool bIsPressed)
 {
-  KeyMap.Add(Key, bIsPressed);
+  //KeyMap.Add(Key, bIsPressed);
+  SetKeyPressed(Key, bIsPressed);
 }
 
 bool AOutcastCharacter::Server_SetKey_Validate(const EKey Key, const bool bIsPressed)
@@ -930,23 +1023,37 @@ bool AOutcastCharacter::Server_SetKey_Validate(const EKey Key, const bool bIsPre
   return true;
 }
 
+bool AOutcastCharacter::GetMousePressed(const EMouse MouseKey)
+{
+  return MouseMap[static_cast<int>(MouseKey)];
+}
+
+void AOutcastCharacter::SetMousePressed(const EMouse MouseKey, const bool bIsPressed)
+{
+  MouseMap[static_cast<int>(MouseKey)] = bIsPressed;
+}
+
 void AOutcastCharacter::MouseLeftPressed()
 {
+  SetMousePressed(EMouse::Left, true);
   Server_SetMouse(EMouse::Left, true);
 }
 
 void AOutcastCharacter::MouseRightPressed()
 {
+  SetMousePressed(EMouse::Right, true);
   Server_SetMouse(EMouse::Right, true);
 }
 
 void AOutcastCharacter::MouseLeftReleased()
 {
+  SetMousePressed(EMouse::Left, false);
   Server_SetMouse(EMouse::Left, false);
 }
 
 void AOutcastCharacter::MouseRightReleased()
 {
+  SetMousePressed(EMouse::Right, false);
   Server_SetMouse(EMouse::Right, false);
 }
 
@@ -964,7 +1071,8 @@ void AOutcastCharacter::MouseRightLeft(const float AxisValue)
 
 void AOutcastCharacter::Server_SetMouse_Implementation(const EMouse Key, const bool bIsPressed)
 {
-  MouseMap.Add(Key, bIsPressed);
+  //MouseMap.Add(Key, bIsPressed);
+  SetMousePressed(Key, bIsPressed);
 }
 
 bool AOutcastCharacter::Server_SetMouse_Validate(const EMouse Key, const bool bIsPressed)
@@ -992,8 +1100,8 @@ void AOutcastCharacter::OnHit(
   // Character is on top of a walkable plane
   if (OtherActor->ActorHasTag(FName("Walkable")))
   {
-    if (KeyMap[EKey::Space]
-      && (KeyMap[EKey::A] || KeyMap[EKey::D])
+    if (  GetKeyPressed(EKey::Space)
+      && (GetKeyPressed(EKey::A) || GetKeyPressed(EKey::D))
       && (Jumping == EJump::Downwards || Jumping == EJump::BunnyHop))
     {
       Jumping = EJump::BunnyHop;
