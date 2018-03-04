@@ -10,15 +10,13 @@ AOutcastCharacter::AOutcastCharacter()
   ForwardDirection(0.0f),
   SidewardDirection(0.0f),
   Acceleration(0.0f),
+  AccelerationCoefficient(5.0f),
   MaxWalkSpeed(10),
 
   Speed(0.0f),
   Direction(FVector()),
   WalkPlayrate(1.0f),
   LegsRotation(FRotator()),
-  TorsoRotation(FRotator()),
-  CharacterRotation(FRotator()),
-  CharacterLocation(FVector()),
   Jumping(EJump::Downwards),
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
@@ -310,22 +308,34 @@ void AOutcastCharacter::BeginPlay()
   }
 }
 
-void AOutcastCharacter::OnRep_ServerState()
+void AOutcastCharacter::ResetToServerState(const FState& State)
 {
-  SetActorLocation(ServerState.Location);
-  SetActorRotation(ReturnFRotator(ServerState.Rotation));
-  
-  CleanUnacknowledgedMoves();
-  ReconcileWithServer();
+  SetActorLocation(State.Location);
+  SetActorRotation(ReturnFRotator(State.Rotation));
+  if (Anim)
+  {
+    Anim->SetAccelerationAndLegRotation(State.Move.Acceleration, State.Move.ForwardDirection, State.Move.SidewardDirection);
+  }
 }
 
-FState AOutcastCharacter::CreateState(const float TimeStamp)
+void AOutcastCharacter::OnRep_ServerState()
+{
+  ResetToServerState(ServerState);
+  
+  if (IsLocallyControlled())
+  {
+    CleanUnacknowledgedMoves();
+    ReconcileWithServer();
+  }
+}
+
+FState AOutcastCharacter::CreateState(const FMove& Move)
 {
   FState NewState;
 
   NewState.Location  = GetActorLocation();
   NewState.Rotation  = ReturnFVector(GetActorRotation());
-  NewState.TimeStamp = TimeStamp;
+  NewState.Move      = Move;
 
   return NewState;
 }
@@ -339,6 +349,7 @@ FMove AOutcastCharacter::CreateMove(const float DeltaTime)
   NewMove.ForwardDirection  = ForwardDirection;
   NewMove.SidewardDirection = SidewardDirection;
   NewMove.Acceleration      = Acceleration;
+  NewMove.MouseInput        = MouseInput;
 
   if (!HasAuthority())
   {
@@ -350,9 +361,9 @@ FMove AOutcastCharacter::CreateMove(const float DeltaTime)
 
 void AOutcastCharacter::Server_SendMove_Implementation(const FMove Move)
 {
-  SimulateMovement(Move);
+  Simulate(Move);
 
-  ServerStates.Add(CreateState(Move.TimeStamp));
+  ServerStates.Add(CreateState(Move));
 
   if (ServerStates.Num() > 100)
   {
@@ -372,7 +383,7 @@ void AOutcastCharacter::CleanUnacknowledgedMoves()
 
   for (const FMove& Move : UnacknowledgedMoves)
   {
-    if (Move.TimeStamp > ServerState.TimeStamp)
+    if (Move.TimeStamp > ServerState.Move.TimeStamp)
     {
       NewList.Add(Move);
     }
@@ -385,10 +396,16 @@ void AOutcastCharacter::ReconcileWithServer()
 {
   for (const FMove& Move : UnacknowledgedMoves)
   {
-    SimulateMovement(Move);
+    Simulate(Move);
   }
 
   UnacknowledgedMoves.Empty();
+}
+
+void AOutcastCharacter::Simulate(const FMove& Move)
+{
+  SimulateLookAround(Move);
+  SimulateMovement(Move);
 }
 
 FVector AOutcastCharacter::ReturnFVector(const FRotator& Rotator)
@@ -508,153 +525,6 @@ void AOutcastCharacter::BodyOverlapEnd(
 
 void AOutcastCharacter::Look()
 {
-  // Rotate whole Character
-  CharacterRotation = GetActorRotation();
-  CharacterRotation.Yaw = CharacterRotation.Yaw + MouseInput.X;
-  SetActorRotation(CharacterRotation);
-
-  // Rotate the torso of the character
-  TorsoRotation = Anim->GetTorsoRotation();
-  TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
-  Anim->SetTorsoRotation(TorsoRotation);
-
-  // Rotate the camera
-  FRotator NewCameraRot = Camera->GetComponentRotation();
-  NewCameraRot.Pitch = NewCameraRot.Pitch + MouseInput.Y;
-
-  if (NewCameraRot.Pitch >= -80.0f
-    && NewCameraRot.Pitch <= 80.0f)
-  {
-    Camera->SetWorldRotation(NewCameraRot);
-
-    FVector NewCameraLoc = Camera->RelativeLocation;
-    const float NewRadius = NewCameraLoc.Size();
-    const float Angle = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
-
-    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(MouseInput.Y));
-    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(MouseInput.Y));
-
-    Camera->SetRelativeLocation(NewCameraLoc);
-  }
-}
-
-void AOutcastCharacter::Walk()
-{
-  /*
-  Direction = FVector(0.0f, 0.0f, 0.0f);
-  WalkPlayrate = 1.0f;
-
-  //**** DIRECTION ****
-  if (GetKeyPressed(EKey::W))
-  {
-    Direction = Direction + GetActorRotation().Vector();
-  }
-
-  if (GetKeyPressed(EKey::A))
-  {
-    FRotator Rot = GetActorRotation();
-    Rot.Yaw = Rot.Yaw - 90.0f;
-    Direction = Direction + Rot.Vector();
-  }
-
-  if (GetKeyPressed(EKey::S))
-  {
-    Direction = Direction + GetActorRotation().Vector() * -1;
-    WalkPlayrate = -1.0f;
-  }
-
-  if (GetKeyPressed(EKey::D))
-  {
-    FRotator Rot = GetActorRotation();
-    Rot.Yaw = Rot.Yaw + 90.0f;
-    Direction = Direction + Rot.Vector();
-  }
-  //**** DIRECTION ****
-
-  //**** SPEED ****
-  if ( GetKeyPressed(EKey::W) && !GetKeyPressed(EKey::S)
-    || GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D)
-    || GetKeyPressed(EKey::S) && !GetKeyPressed(EKey::W)
-    || GetKeyPressed(EKey::D) && !GetKeyPressed(EKey::A))
-  {
-    Speed = FMath::Clamp(Speed + 5.0f, MinSpeed, MaxSpeed);
-  }
-  else
-  {
-    Speed = FMath::Clamp(Speed - 5.0f, MinSpeed, MaxSpeed);
-  }
-
-  Anim->SetAcceleration(Speed);
-  Anim->SetWalkPlayrate(WalkPlayrate);
-
-  if (Speed == 0.0f)
-  {
-    Direction = GetActorRotation().Vector();
-  }
-  //**** SPEED ****
-
-  //**** LEGS ROTATION ****
-  if (GetKeyPressed(EKey::W))
-  {
-    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-    if (GetKeyPressed(EKey::A))
-    {
-      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
-    }
-    else if (GetKeyPressed(EKey::D))
-    {
-      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
-    }
-  }
-  else if (GetKeyPressed(EKey::S))
-  {
-    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-    if (GetKeyPressed(EKey::A))
-    {
-      LegsRotation = FRotator(0.0f, 45.0f, 0.0f);
-    }
-    else if (GetKeyPressed(EKey::D))
-    {
-      LegsRotation = FRotator(0.0f, -45.0f, 0.0f);
-    }
-  }
-  else if (GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D))
-  {
-    LegsRotation = FRotator(0.0f, -90.0f, 0.0f);
-  }
-  else if (GetKeyPressed(EKey::D) && !GetKeyPressed(EKey::A))
-  {
-    LegsRotation = FRotator(0.0f, 90.0f, 0.0f);
-  }
-  else
-  {
-    LegsRotation = FRotator(0.0f, 0.0f, 0.0f);
-  }
-
-  Anim->SetLegsRotation(LegsRotation);
-  //**** LEGS ROTATION ****
-
-  if (!Direction.IsZero())
-  {
-    if (Jumping == EJump::NONE)
-    {
-      //AddMovementInput(Direction, Speed / 5);
-      Capsule->AddWorldOffset(Direction * (Speed / 5), true);
-    }
-    else if (Jumping == EJump::BunnyHop)
-    {
-      AddMovementInput(Direction, Speed / BunnyHopSpeedRatio);
-    }
-    else
-    {
-      AddMovementInput(Direction, Speed / DefaultJumpSpeedRatio);
-    }
-  }
-
-  if (HasAuthority())
-  {
-    CharacterLocation = GetActorLocation();
-  }*/
 }
 
 void AOutcastCharacter::Jump()
@@ -810,11 +680,43 @@ void AOutcastCharacter::RegulateAcceleration()
   if ( ForwardDirection != 0.0f
     || SidewardDirection != 0.0f)
   {
-    Acceleration = FMath::Clamp(Acceleration + 2, 0, 100);
+    Acceleration = FMath::Clamp(Acceleration + AccelerationCoefficient, 0, 100);
   }
   else
   {
-    Acceleration = FMath::Clamp(Acceleration - 2, 0, 100);
+    Acceleration = FMath::Clamp(Acceleration - AccelerationCoefficient, 0, 100);
+  }
+}
+
+void AOutcastCharacter::SimulateLookAround(const FMove& Move)
+{
+  // Rotate whole Character
+  FRotator CharacterRotation = GetActorRotation();
+  CharacterRotation.Yaw      = CharacterRotation.Yaw + Move.MouseInput.X;
+  SetActorRotation(CharacterRotation);
+
+  if (Anim)
+  {
+    Anim->SetTorsoRotation(Move.MouseInput);
+  }
+
+  // Rotate the camera
+  FRotator NewCameraRot = Camera->GetComponentRotation();
+  NewCameraRot.Pitch    = NewCameraRot.Pitch + Move.MouseInput.Y;
+
+  if ( NewCameraRot.Pitch >= -80.0f
+    && NewCameraRot.Pitch <= 80.0f)
+  {
+    Camera->SetWorldRotation(NewCameraRot);
+
+    FVector NewCameraLoc  = Camera->RelativeLocation;
+    const float NewRadius = NewCameraLoc.Size();
+    const float Angle     = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
+
+    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(Move.MouseInput.Y));
+    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(Move.MouseInput.Y));
+
+    Camera->SetRelativeLocation(NewCameraLoc);
   }
 }
 
@@ -822,6 +724,11 @@ void AOutcastCharacter::SimulateMovement(const FMove& Move)
 {
   Capsule->AddWorldOffset(GetActorForwardVector() * Move.ForwardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
   Capsule->AddWorldOffset(GetActorRightVector() * Move.SidewardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
+
+  if (Anim)
+  {
+    Anim->SetAccelerationAndLegRotation(Move.Acceleration, Move.ForwardDirection, Move.SidewardDirection);
+  }
 
   // Gravity
   Capsule->AddWorldOffset(GetActorUpVector() * -1 * 990 * Move.DeltaTime, true);
@@ -839,11 +746,11 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
     FMove Move = CreateMove(DeltaTime);
 
-    SimulateMovement(Move);
+    Simulate(Move);
 
     if (HasAuthority())
     {
-      ServerState = CreateState(Move.TimeStamp);
+      ServerState = CreateState(Move);
     }
     else
     {

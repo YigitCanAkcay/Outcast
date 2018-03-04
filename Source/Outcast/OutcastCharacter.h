@@ -69,7 +69,8 @@ struct FMove
     TimeStamp(0.0f), 
     ForwardDirection(0.0f), 
     SidewardDirection(0.0f),
-    Acceleration(0.0f)
+    Acceleration(0.0f),
+    MouseInput(FVector2D::ZeroVector)
   {}
 
   UPROPERTY()
@@ -86,6 +87,9 @@ struct FMove
 
   UPROPERTY()
   float Acceleration;
+
+  UPROPERTY()
+  FVector2D MouseInput;
 };
 
 USTRUCT()
@@ -100,7 +104,7 @@ struct FState
   FVector Rotation;
 
   UPROPERTY()
-  float TimeStamp;
+  FMove Move;
 };
 
 UCLASS()
@@ -164,9 +168,10 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** REPLICATION ********
   UPROPERTY(ReplicatedUsing = OnRep_ServerState)
   FState ServerState;
+  void ResetToServerState(const FState& State);
   UFUNCTION()
   void OnRep_ServerState();
-  FState CreateState(const float TimeStamp);
+  FState CreateState(const FMove& Move);
 
   TArray<FState> ServerStates;
 
@@ -177,6 +182,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   TArray<FMove> UnacknowledgedMoves;
   void CleanUnacknowledgedMoves();
   void ReconcileWithServer();
+
+  void Simulate(const FMove& Move);
   //******** REPLICATION ********
 
   //******** HELPERS ********
@@ -188,9 +195,11 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   float ForwardDirection;
   float SidewardDirection;
   int Acceleration;
+  int AccelerationCoefficient;
   int MaxWalkSpeed;
 
   void RegulateAcceleration();
+  void SimulateLookAround(const FMove& Move);
   void SimulateMovement(const FMove& Move);
 
   void MoveForward(const float AxisValue);
@@ -202,8 +211,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   FVector Direction;
   float WalkPlayrate;
   FRotator LegsRotation;
-  FRotator TorsoRotation;
-  FRotator CharacterRotation;
   FVector CharacterLocation;
 
   EJump Jumping;
@@ -286,7 +293,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** TICK FUNCTIONS ********
   void Look();
-  void Walk();
   void Jump();
   void DoAttack(const float DeltaTime);
   void TakeConsecutiveDamage(const float DeltaTime);

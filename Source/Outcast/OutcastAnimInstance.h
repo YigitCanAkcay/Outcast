@@ -50,7 +50,7 @@ public:
   void SetIsRunning(const bool bNewIsRunning);
   bool GetIsRunning() const;
 
-  void SetAcceleration(const float NewSpeed);
+  void SetAccelerationAndLegRotation(const float NewSpeed, const float ForwardDirection, const float SidewardDirection);
 
   void SetIsJumping(const bool bNewIsJumping);
   bool GetIsJumping() const;
@@ -72,7 +72,7 @@ public:
 
   void SetWalkPlayrate(const float NewPlayRate);
 
-  void SetTorsoRotation(const FRotator& NewTorsoRotation);
+  void SetTorsoRotation(const FVector2D& MouseInput);
   FRotator GetTorsoRotation() const;
 
   void SetLegsRotation(const FRotator& NewLegsRotation);

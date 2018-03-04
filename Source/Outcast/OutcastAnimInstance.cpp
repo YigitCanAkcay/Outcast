@@ -37,9 +37,45 @@ bool UOutcastAnimInstance::GetIsRunning() const
   return bIsRunning;
 }
 
-void UOutcastAnimInstance::SetAcceleration(const float NewSpeed)
+void UOutcastAnimInstance::SetAccelerationAndLegRotation(const float NewSpeed, const float ForwardDirection, const float SidewardDirection)
 {
   Speed = NewSpeed;
+
+  FRotator NewLegsRotation;
+  NewLegsRotation = FRotator::ZeroRotator;
+
+  if (ForwardDirection == 1.0f)
+  {
+    if (SidewardDirection == 1.0f)
+    {
+      NewLegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+    }
+    else if (SidewardDirection == -1.0f)
+    {
+      NewLegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+    }
+  }
+  else if (ForwardDirection == -1.0f)
+  {
+    if (SidewardDirection == 1.0f)
+    {
+      NewLegsRotation = FRotator(0.0f, -45.0f, 0.0f);
+    }
+    else if (SidewardDirection == -1.0f)
+    {
+      NewLegsRotation = FRotator(0.0f, 45.0f, 0.0f);
+    }
+  }
+  else if (SidewardDirection == 1.0f)
+  {
+    NewLegsRotation = FRotator(0.0f, 90.0f, 0.0f);
+  }
+  else if (SidewardDirection == -1.0f)
+  {
+    NewLegsRotation = FRotator(0.0f, -90.0f, 0.0f);
+  }
+
+  SetLegsRotation(NewLegsRotation);
 }
 
 void UOutcastAnimInstance::SetIsJumping(const bool bNewIsJumping)
@@ -107,9 +143,9 @@ void UOutcastAnimInstance::SetWalkPlayrate(const float NewPlayRate)
   PlayRate = NewPlayRate;
 }
 
-void UOutcastAnimInstance::SetTorsoRotation(const FRotator& NewTorsoRotation)
+void UOutcastAnimInstance::SetTorsoRotation(const FVector2D& MouseInput)
 {
-  TorsoRotation = NewTorsoRotation;
+  TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
 }
 
 
