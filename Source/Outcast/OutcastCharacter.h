@@ -173,8 +173,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void OnRep_ServerState();
   FState CreateState(const FMove& Move);
 
-  TArray<FState> ServerStates;
-
   FMove CreateMove(const float DeltaTime);
   UFUNCTION(Server, Reliable, WithValidation)
   void Server_SendMove(const FMove Move);

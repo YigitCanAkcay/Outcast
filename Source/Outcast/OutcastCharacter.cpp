@@ -315,6 +315,7 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
   if (Anim)
   {
     Anim->SetAccelerationAndLegRotation(State.Move.Acceleration, State.Move.ForwardDirection, State.Move.SidewardDirection);
+    Anim->SetTorsoRotation(State.Move.MouseInput.Y * State.Move.DeltaTime);
   }
 }
 
@@ -322,20 +323,17 @@ void AOutcastCharacter::OnRep_ServerState()
 {
   ResetToServerState(ServerState);
   
-  if (IsLocallyControlled())
-  {
-    CleanUnacknowledgedMoves();
-    ReconcileWithServer();
-  }
+  CleanUnacknowledgedMoves();
+  ReconcileWithServer();
 }
 
 FState AOutcastCharacter::CreateState(const FMove& Move)
 {
   FState NewState;
 
-  NewState.Location  = GetActorLocation();
-  NewState.Rotation  = ReturnFVector(GetActorRotation());
-  NewState.Move      = Move;
+  NewState.Location = GetActorLocation();
+  NewState.Rotation = ReturnFVector(GetActorRotation());
+  NewState.Move     = Move;
 
   return NewState;
 }
@@ -363,13 +361,7 @@ void AOutcastCharacter::Server_SendMove_Implementation(const FMove Move)
 {
   Simulate(Move);
 
-  ServerStates.Add(CreateState(Move));
-
-  if (ServerStates.Num() > 100)
-  {
-    ServerState = ServerStates.Last();
-    ServerStates.Empty();
-  }
+  ServerState = CreateState(Move);
 
   Multicast_SendMove(Move);
 }
@@ -414,7 +406,7 @@ void AOutcastCharacter::ReconcileWithServer()
     Simulate(Move);
   }
 
-  UnacknowledgedMoves.Empty();
+  //UnacknowledgedMoves.Empty();
 }
 
 void AOutcastCharacter::Simulate(const FMove& Move)
@@ -703,14 +695,15 @@ void AOutcastCharacter::SimulateLookAround(const FMove& Move)
 {
   // Rotate whole Character
   FRotator CharacterRotation = GetActorRotation();
-  CharacterRotation.Yaw      = CharacterRotation.Yaw + Move.MouseInput.X;
+  CharacterRotation.Yaw      = CharacterRotation.Yaw + Move.MouseInput.X * Move.DeltaTime;
   SetActorRotation(CharacterRotation);
 
   if (Anim)
   {
-    Anim->SetTorsoRotation(Move.MouseInput);
+    Anim->SetTorsoRotation(Move.MouseInput.Y * Move.DeltaTime);
   }
 
+  /*
   // Rotate the camera
   FRotator NewCameraRot = Camera->GetComponentRotation();
   NewCameraRot.Pitch    = NewCameraRot.Pitch + Move.MouseInput.Y;
@@ -728,7 +721,7 @@ void AOutcastCharacter::SimulateLookAround(const FMove& Move)
     NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(Move.MouseInput.Y));
 
     Camera->SetRelativeLocation(NewCameraLoc);
-  }
+  }*/
 }
 
 void AOutcastCharacter::SimulateMovement(const FMove& Move)
@@ -739,6 +732,7 @@ void AOutcastCharacter::SimulateMovement(const FMove& Move)
   if (Anim)
   {
     Anim->SetAccelerationAndLegRotation(Move.Acceleration, Move.ForwardDirection, Move.SidewardDirection);
+    Anim->SetWalkPlayrate(Move.ForwardDirection);
   }
 
   // Gravity

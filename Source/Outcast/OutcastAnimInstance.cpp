@@ -140,12 +140,19 @@ bool UOutcastAnimInstance::GetIsSlashingForward() const
 
 void UOutcastAnimInstance::SetWalkPlayrate(const float NewPlayRate)
 {
-  PlayRate = NewPlayRate;
+  if (NewPlayRate == 0.0f)
+  {
+    PlayRate = 1.0f;
+  }
+  else
+  {
+    PlayRate = NewPlayRate;
+  }
 }
 
-void UOutcastAnimInstance::SetTorsoRotation(const FVector2D& MouseInput)
+void UOutcastAnimInstance::SetTorsoRotation(const float MouseInputY)
 {
-  TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInput.Y, -80.0f, 80.0f);
+  TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInputY, -80.0f, 80.0f);
 }
 
 

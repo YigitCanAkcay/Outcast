@@ -72,7 +72,7 @@ public:
 
   void SetWalkPlayrate(const float NewPlayRate);
 
-  void SetTorsoRotation(const FVector2D& MouseInput);
+  void SetTorsoRotation(const float MouseInputY);
   FRotator GetTorsoRotation() const;
 
   void SetLegsRotation(const FRotator& NewLegsRotation);
