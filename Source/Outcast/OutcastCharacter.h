@@ -198,6 +198,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void ReconcileWithServer();
 
   void Simulate(const FMove& Move);
+
+  bool bReconcilingWithServer;
   //******** REPLICATION ********
 
   //******** SIMULATION ********

@@ -7,6 +7,7 @@
 AOutcastCharacter::AOutcastCharacter()
   :
   ServerState(),
+  bReconcilingWithServer(false),
   ForwardDirection(0.0f),
   SidewardDirection(0.0f),
   Acceleration(0.0f),
@@ -302,16 +303,6 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
 {
   SetActorLocation(State.Location);
   SetActorRotation(ReturnFRotator(State.Rotation));
-
-  UE_LOG(LogTemp, Warning, TEXT("%d %d"), Health, State.Health);
-  if (Health - State.Health > 10)
-  {
-    PlayHitSound();
-  }
-  else if (Health != State.Health)
-  {
-    PlayIdleHitSound();
-  }
   Health = State.Health;
 
   if (Anim)
@@ -327,6 +318,7 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
 
 void AOutcastCharacter::OnRep_ServerState()
 {
+  bReconcilingWithServer = true;
   if (IsLocallyControlled())
   {
     ResetToServerState(ServerState);
@@ -339,6 +331,7 @@ void AOutcastCharacter::OnRep_ServerState()
     ResetToServerState(ServerState);
     Simulate(ServerState.Move);
   }
+  bReconcilingWithServer = false;
 }
 
 FState AOutcastCharacter::CreateState(const FMove& Move)
@@ -543,21 +536,21 @@ void AOutcastCharacter::SimulateConsecutiveDamage(const float DeltaTime)
   {
     AttackerIt->Value = AttackerIt->Value + DeltaTime;
 
-    if (AttackerIt->Value >= 1.0f)
+    if (AttackerIt->Value >= 1.0f && !bReconcilingWithServer)
     {
       AttackerIt->Value = 0.0f;
 
       if (AttackerIt->Key->GetAttack() == EAttack::NONE)
       {
         Health = FMath::Clamp(Health - 1, 0, 100);
-        //PlayIdleHitSound();
+        PlayIdleHitSound();
       }
       else
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
-        //PlayHitSound();
+        PlayHitSound();
       }
-      //PlayHitVocalSound();
+      PlayHitVocalSound();
     }
   }
 }
@@ -653,13 +646,10 @@ void AOutcastCharacter::BodyOverlapBegin(
   int32 OtherBodyIndex,
   bool bFromSweep,
   const FHitResult& SweepResult)
-{
-  // Other Actor is the actor that triggered the event. Check that is not ourself.  
-  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
+{ 
+  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
   {
     AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
-
-    UE_LOG(LogTemp, Warning, TEXT("OVERLAP!"));
 
     if (!DamageTakenBy.Contains(AttackingCharacter))
     {
@@ -675,7 +665,7 @@ void AOutcastCharacter::BodyOverlapBegin(
         Health = FMath::Clamp(Health - 20, 0, 100);
         //PlayHitSound();
       }
-      //PlayHitVocalSound();
+      PlayHitVocalSound();
     }
   }
 }
@@ -686,8 +676,7 @@ void AOutcastCharacter::BodyOverlapEnd(
   UPrimitiveComponent* OtherComp,
   int32 OtherBodyIndex)
 {
-  // Other Actor is the actor that triggered the event. Check that is not ourself.  
-  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
+  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
   {
     AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
 
