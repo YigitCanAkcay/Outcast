@@ -370,9 +370,24 @@ void AOutcastCharacter::Server_SendMove_Implementation(const FMove Move)
     ServerState = ServerStates.Last();
     ServerStates.Empty();
   }
+
+  Multicast_SendMove(Move);
 }
 
 bool AOutcastCharacter::Server_SendMove_Validate(const FMove Move)
+{
+  return true;
+}
+
+void AOutcastCharacter::Multicast_SendMove_Implementation(const FMove Move)
+{
+  if (Role == ROLE_SimulatedProxy)
+  {
+    Simulate(Move);
+  }
+}
+
+bool AOutcastCharacter::Multicast_SendMove_Validate(const FMove Move)
 {
   return true;
 }

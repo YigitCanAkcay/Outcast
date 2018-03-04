@@ -178,6 +178,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   FMove CreateMove(const float DeltaTime);
   UFUNCTION(Server, Reliable, WithValidation)
   void Server_SendMove(const FMove Move);
+  UFUNCTION(NetMulticast, Reliable, WithValidation)
+  void Multicast_SendMove(const FMove Move);
 
   TArray<FMove> UnacknowledgedMoves;
   void CleanUnacknowledgedMoves();
