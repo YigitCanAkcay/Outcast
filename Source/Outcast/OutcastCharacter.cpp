@@ -93,7 +93,9 @@ AOutcastCharacter::AOutcastCharacter()
   Capsule->OnComponentEndOverlap.AddDynamic(this, &AOutcastCharacter::BodyOverlapEnd);
   
   Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-  Camera->SetupAttachment(RootComponent);
+  CameraRotator = CreateDefaultSubobject<UBoxComponent>(TEXT("CameraRotator"));
+  CameraRotator->SetupAttachment(RootComponent);
+  Camera->SetupAttachment(CameraRotator);
   Camera->SetRelativeLocation(FVector(-423.0f, 0.0f, 200.0f));
   Camera->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
 
@@ -315,7 +317,7 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
   if (Anim)
   {
     Anim->SetAccelerationAndLegRotation(State.Move.Acceleration, State.Move.ForwardDirection, State.Move.SidewardDirection);
-    Anim->SetTorsoRotation(State.Move.MouseInput.Y * State.Move.DeltaTime);
+    Anim->SetTorsoRotation(ReturnFRotator(State.TorsoRotation));
   }
 }
 
@@ -331,9 +333,10 @@ FState AOutcastCharacter::CreateState(const FMove& Move)
 {
   FState NewState;
 
-  NewState.Location = GetActorLocation();
-  NewState.Rotation = ReturnFVector(GetActorRotation());
-  NewState.Move     = Move;
+  NewState.Location      = GetActorLocation();
+  NewState.Rotation      = ReturnFVector(GetActorRotation());
+  NewState.TorsoRotation = ReturnFVector(Anim->GetTorsoRotation());
+  NewState.Move          = Move;
 
   return NewState;
 }
@@ -439,43 +442,64 @@ int AOutcastCharacter::GetHealth()
 
 void AOutcastCharacter::PlayStepSound()
 {
-  int Random = FMath::RandRange(0, StepSounds.Num() - 1);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), StepSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  if (StepSounds.Num() > 0)
+  {
+    int Random = FMath::RandRange(0, StepSounds.Num() - 1);
+    UGameplayStatics::PlaySoundAtLocation(GetWorld(), StepSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  }
 }
 
 void AOutcastCharacter::PlayJumpVocalSound()
 {
-  int Random = FMath::RandRange(0, JumpVocalSounds.Num() - 1);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), JumpVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  if (JumpVocalSounds.Num() > 0)
+  {
+    int Random = FMath::RandRange(0, JumpVocalSounds.Num() - 1);
+    UGameplayStatics::PlaySoundAtLocation(GetWorld(), JumpVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  }
 }
 
 void AOutcastCharacter::PlayAttackVocalSound()
 {
-  int Random = FMath::RandRange(0, AttackVocalSounds.Num() - 1);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), AttackVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  if (AttackVocalSounds.Num() > 0)
+  {
+    int Random = FMath::RandRange(0, AttackVocalSounds.Num() - 1);
+    UGameplayStatics::PlaySoundAtLocation(GetWorld(), AttackVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  }
 }
 
 void AOutcastCharacter::PlayAttackSound()
 {
-  int Random = 0;//FMath::RandRange(0, 0);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), AttackSounds[Random], GetActorLocation(), 0.35f, 1.0f, 0.0f, Attenuation);
+  if (AttackSounds.Num() > 0)
+  {
+    int Random = 0;//FMath::RandRange(0, 0);
+    UGameplayStatics::PlaySoundAtLocation(GetWorld(), AttackSounds[Random], GetActorLocation(), 0.35f, 1.0f, 0.0f, Attenuation);
+  }
 }
 
 void AOutcastCharacter::PlayHitSound()
 {
-  int Random = 0;// FMath::RandRange(0, 3);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  if (HitSounds.Num() > 0)
+  {
+    int Random = 0;// FMath::RandRange(0, 3);
+    UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  }
 }
 
 void AOutcastCharacter::PlayHitVocalSound()
 {
-  int Random = FMath::RandRange(0, HitVocalSounds.Num() - 1);
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  if (HitVocalSounds.Num() > 0)
+  {
+    int Random = FMath::RandRange(0, HitVocalSounds.Num() - 1);
+    UGameplayStatics::PlaySoundAtLocation(GetWorld(), HitVocalSounds[Random], GetActorLocation(), 0.25f, 1.0f, 0.0f, Attenuation);
+  }
 }
 
 void AOutcastCharacter::PlayIdleHitSound()
 {
-  UGameplayStatics::PlaySoundAtLocation(GetWorld(), IdleHitSound, GetActorLocation(), 0.5f, 1.0f, 0.0f, Attenuation);
+  if (IdleHitSound)
+  {
+    UGameplayStatics::PlaySoundAtLocation(GetWorld(), IdleHitSound, GetActorLocation(), 0.5f, 1.0f, 0.0f, Attenuation);
+  }
 }
 
 void AOutcastCharacter::BodyOverlapBegin(
@@ -700,28 +724,17 @@ void AOutcastCharacter::SimulateLookAround(const FMove& Move)
 
   if (Anim)
   {
-    Anim->SetTorsoRotation(Move.MouseInput.Y * Move.DeltaTime);
+    Anim->CalculateTorsoRotation(Move.MouseInput.Y * Move.DeltaTime);
+
+    if (IsLocallyControlled())
+    {
+      // Rotate the camera
+      FRotator NewCameraRot = CameraRotator->GetComponentRotation();
+      NewCameraRot.Pitch    = FMath::Clamp((Anim->GetTorsoRotation().Roll + Move.MouseInput.Y * Move.DeltaTime) * -1, -80.0f, 80.0f);
+
+      CameraRotator->SetWorldRotation(NewCameraRot);
+    }
   }
-
-  /*
-  // Rotate the camera
-  FRotator NewCameraRot = Camera->GetComponentRotation();
-  NewCameraRot.Pitch    = NewCameraRot.Pitch + Move.MouseInput.Y;
-
-  if ( NewCameraRot.Pitch >= -80.0f
-    && NewCameraRot.Pitch <= 80.0f)
-  {
-    Camera->SetWorldRotation(NewCameraRot);
-
-    FVector NewCameraLoc  = Camera->RelativeLocation;
-    const float NewRadius = NewCameraLoc.Size();
-    const float Angle     = FMath::Atan2(NewCameraLoc.Z, (NewCameraLoc.X == 0 ? 1 : NewCameraLoc.X));
-
-    NewCameraLoc.Z = NewRadius * FMath::Sin(Angle + FMath::DegreesToRadians(Move.MouseInput.Y));
-    NewCameraLoc.X = NewRadius * FMath::Cos(Angle + FMath::DegreesToRadians(Move.MouseInput.Y));
-
-    Camera->SetRelativeLocation(NewCameraLoc);
-  }*/
 }
 
 void AOutcastCharacter::SimulateMovement(const FMove& Move)

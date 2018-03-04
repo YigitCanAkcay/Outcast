@@ -8,6 +8,7 @@
 #include "Runtime/Engine/Classes/Animation/AnimBlueprint.h"
 #include "Runtime/Engine/Classes/Camera/CameraComponent.h"
 #include "Runtime/Engine/Classes/Components/CapsuleComponent.h"
+#include "Runtime/Engine/Classes/Components/BoxComponent.h"
 #include "Runtime/Engine/Classes/GameFramework/CharacterMovementComponent.h"
 #include "Runtime/Engine/Classes/Animation/SkeletalMeshActor.h"
 #include "Runtime/Engine/Classes/Engine/SkeletalMeshSocket.h"
@@ -104,6 +105,9 @@ struct FState
   FVector Rotation;
 
   UPROPERTY()
+  FVector TorsoRotation;
+
+  UPROPERTY()
   FMove Move;
 };
 
@@ -128,6 +132,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   UPROPERTY(VisibleAnywhere, Category = Camera)
   UCameraComponent* Camera;
+  UBoxComponent* CameraRotator;
 
   UCharacterMovementComponent* Movement;
   //******** COMPONENTS ********

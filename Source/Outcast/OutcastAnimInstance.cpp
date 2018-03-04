@@ -150,11 +150,15 @@ void UOutcastAnimInstance::SetWalkPlayrate(const float NewPlayRate)
   }
 }
 
-void UOutcastAnimInstance::SetTorsoRotation(const float MouseInputY)
+void UOutcastAnimInstance::CalculateTorsoRotation(const float MouseInputY)
 {
   TorsoRotation.Roll = FMath::Clamp(TorsoRotation.Roll - MouseInputY, -80.0f, 80.0f);
 }
 
+void UOutcastAnimInstance::SetTorsoRotation(const FRotator NewTorsoRotation)
+{
+  TorsoRotation = NewTorsoRotation;
+}
 
 FRotator UOutcastAnimInstance::GetTorsoRotation() const
 {
