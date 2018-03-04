@@ -37,9 +37,9 @@ UENUM()
 enum class EAttack
 {
   NONE    = 0,
-  Left    = 1,
-  Right   = 2,
-  Forward = 3
+  Left    = 2,
+  Right   = 3,
+  Forward = 4
 };
 
 UENUM()
@@ -91,6 +91,9 @@ struct FMove
 
   UPROPERTY()
   FVector2D MouseInput;
+
+  UPROPERTY()
+  TArray<bool> MouseMap;
 };
 
 USTRUCT()
@@ -106,6 +109,12 @@ struct FState
 
   UPROPERTY()
   FVector TorsoRotation;
+
+  UPROPERTY()
+  EAttack CurrentAttack;
+
+  UPROPERTY()
+  int Health;
 
   UPROPERTY()
   FMove Move;
@@ -191,6 +200,13 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void Simulate(const FMove& Move);
   //******** REPLICATION ********
 
+  //******** SIMULATION ********
+  void SimulateLookAround(const FMove& Move);
+  void SimulateMovement(const FMove& Move);
+  void SimulateAttacks(const FMove& Move);
+  void SimulateConsecutiveDamage(const float DeltaTime);
+  //******** SIMULATION ********
+
   //******** HELPERS ********
   FVector ReturnFVector(const FRotator& Rotator);
   FRotator ReturnFRotator(const FVector& Vector);
@@ -204,19 +220,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   int MaxWalkSpeed;
 
   void RegulateAcceleration();
-  void SimulateLookAround(const FMove& Move);
-  void SimulateMovement(const FMove& Move);
-
-  void MoveForward(const float AxisValue);
-  void MoveRight(const float AxisValue);
-
-  float Speed;
-  const float MaxSpeed = 100.0f;
-  const float MinSpeed = 0.0f;
-  FVector Direction;
-  float WalkPlayrate;
-  FRotator LegsRotation;
-  FVector CharacterLocation;
 
   EJump Jumping;
   float JumpHeight;
@@ -236,7 +239,7 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   TMap<AOutcastCharacter*, float> DamageTakenBy;
 
-  EAttack Attacking;
+  EAttack CurrentAttack;
   int Health;
 
   UFUNCTION()
@@ -256,7 +259,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** ATTACKING ********
 
   //******** PLAYER INPUT ********
-  TArray<bool> KeyMap;
+  void MoveForward(const float AxisValue);
+  void MoveRight(const float AxisValue);
 
   FVector2D MouseInput;
   TArray<bool> MouseMap;
@@ -282,8 +286,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** TICK FUNCTIONS ********
   void Jump();
-  void DoAttack(const float DeltaTime);
-  void TakeConsecutiveDamage(const float DeltaTime);
   //******** TICK FUNCTIONS ********
 
 public:

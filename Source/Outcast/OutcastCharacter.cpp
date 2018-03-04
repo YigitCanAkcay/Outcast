@@ -13,31 +13,19 @@ AOutcastCharacter::AOutcastCharacter()
   AccelerationCoefficient(5.0f),
   MaxWalkSpeed(10),
 
-  Speed(0.0f),
-  Direction(FVector()),
-  WalkPlayrate(1.0f),
-  LegsRotation(FRotator()),
   Jumping(EJump::Downwards),
   JumpHeight(0.0f),
   JumpStartLocZ(0.0f),
   BunnyHopSpeedRatio(DefaultJumpSpeedRatio),
-  Attacking(EAttack::NONE),
+  CurrentAttack(EAttack::NONE),
   Health(100),
   MouseInput(FVector2D::ZeroVector)
 {
  	PrimaryActorTick.bCanEverTick = true;
 
-  // Initialize KeyMap
+  // Initialize Mouse Input
   // Since TMaps can't be replicated a TArray will be used instead
   // pre initialized with 5 elements so that EKey can be used to index
-  KeyMap.Add(false);
-  KeyMap.Add(false);
-  KeyMap.Add(false);
-  KeyMap.Add(false);
-  KeyMap.Add(false);
-
-  // Initialize Mouse Input
-  // See comment above on KeyMap
   MouseMap.Add(false);
   MouseMap.Add(false);
 
@@ -314,19 +302,43 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
 {
   SetActorLocation(State.Location);
   SetActorRotation(ReturnFRotator(State.Rotation));
+
+  UE_LOG(LogTemp, Warning, TEXT("%d %d"), Health, State.Health);
+  if (Health - State.Health > 10)
+  {
+    PlayHitSound();
+  }
+  else if (Health != State.Health)
+  {
+    PlayIdleHitSound();
+  }
+  Health = State.Health;
+
   if (Anim)
   {
     Anim->SetAccelerationAndLegRotation(State.Move.Acceleration, State.Move.ForwardDirection, State.Move.SidewardDirection);
     Anim->SetTorsoRotation(ReturnFRotator(State.TorsoRotation));
+
+    /*Anim->SetIsSlashingLeft(   State.CurrentAttack == EAttack::Left);
+    Anim->SetIsSlashingRight(  State.CurrentAttack == EAttack::Right);
+    Anim->SetIsSlashingForward(State.CurrentAttack == EAttack::Forward);*/
   }
 }
 
 void AOutcastCharacter::OnRep_ServerState()
 {
-  ResetToServerState(ServerState);
+  if (IsLocallyControlled())
+  {
+    ResetToServerState(ServerState);
   
-  CleanUnacknowledgedMoves();
-  ReconcileWithServer();
+    CleanUnacknowledgedMoves();
+    ReconcileWithServer();
+  }
+  else if (Role == ROLE_SimulatedProxy)
+  {
+    ResetToServerState(ServerState);
+    Simulate(ServerState.Move);
+  }
 }
 
 FState AOutcastCharacter::CreateState(const FMove& Move)
@@ -336,6 +348,8 @@ FState AOutcastCharacter::CreateState(const FMove& Move)
   NewState.Location      = GetActorLocation();
   NewState.Rotation      = ReturnFVector(GetActorRotation());
   NewState.TorsoRotation = ReturnFVector(Anim->GetTorsoRotation());
+  NewState.CurrentAttack = CurrentAttack;
+  NewState.Health        = Health;
   NewState.Move          = Move;
 
   return NewState;
@@ -351,6 +365,7 @@ FMove AOutcastCharacter::CreateMove(const float DeltaTime)
   NewMove.SidewardDirection = SidewardDirection;
   NewMove.Acceleration      = Acceleration;
   NewMove.MouseInput        = MouseInput;
+  NewMove.MouseMap          = MouseMap;
 
   if (!HasAuthority())
   {
@@ -406,16 +421,145 @@ void AOutcastCharacter::ReconcileWithServer()
 {
   for (const FMove& Move : UnacknowledgedMoves)
   {
-    Simulate(Move);
+    SimulateMovement(Move);
+    SimulateLookAround(Move);
   }
-
-  //UnacknowledgedMoves.Empty();
 }
 
 void AOutcastCharacter::Simulate(const FMove& Move)
 {
   SimulateLookAround(Move);
-  SimulateMovement(Move);
+  SimulateMovement(Move); 
+  SimulateAttacks(Move);
+  SimulateConsecutiveDamage(Move.DeltaTime);
+}
+
+void AOutcastCharacter::SimulateLookAround(const FMove& Move)
+{
+  // Rotate whole Character
+  FRotator CharacterRotation = GetActorRotation();
+  CharacterRotation.Yaw      = CharacterRotation.Yaw + Move.MouseInput.X * Move.DeltaTime;
+  SetActorRotation(CharacterRotation);
+
+  if (Anim)
+  {
+    Anim->CalculateTorsoRotation(Move.MouseInput.Y * Move.DeltaTime);
+
+    if (IsLocallyControlled())
+    {
+      // Rotate the camera
+      FRotator NewCameraRot = CameraRotator->GetComponentRotation();
+      NewCameraRot.Pitch    = FMath::Clamp((Anim->GetTorsoRotation().Roll + Move.MouseInput.Y * Move.DeltaTime) * -1, -80.0f, 80.0f);
+
+      CameraRotator->SetWorldRotation(NewCameraRot);
+    }
+  }
+}
+
+void AOutcastCharacter::SimulateMovement(const FMove& Move)
+{
+  Capsule->AddWorldOffset(GetActorForwardVector() * Move.ForwardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
+  Capsule->AddWorldOffset(GetActorRightVector() * Move.SidewardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
+
+  if (Anim)
+  {
+    Anim->SetAccelerationAndLegRotation(Move.Acceleration, Move.ForwardDirection, Move.SidewardDirection);
+    Anim->SetWalkPlayrate(Move.ForwardDirection);
+  }
+
+  // Gravity
+  Capsule->AddWorldOffset(GetActorUpVector() * -1 * 990 * Move.DeltaTime, true);
+}
+
+void AOutcastCharacter::SimulateAttacks(const FMove& Move)
+{
+  if (CurrentAttack == EAttack::Left)
+  {
+    CurrentAttack = Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE;
+  }
+  else if (CurrentAttack == EAttack::Right)
+  {
+    CurrentAttack = Anim->GetIsSlashingRight() ? EAttack::Right : EAttack::NONE;
+  }
+  else if (CurrentAttack == EAttack::Forward)
+  {
+    CurrentAttack = Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE;
+  }
+
+  if (Move.MouseMap[static_cast<int>(EMouse::Left)])
+  {
+    if (CurrentAttack == EAttack::NONE)
+    {
+      // Slashing left/right has priority over forward
+      if (Move.SidewardDirection == -1.0f)
+      {
+        CurrentAttack = EAttack::Left;
+      }
+      else if (Move.SidewardDirection == 1.0f)
+      {
+        CurrentAttack = EAttack::Right;
+      }
+      else if (Move.SidewardDirection == 0.0f && Move.ForwardDirection != 0.0f)
+      {
+        CurrentAttack = EAttack::Forward;
+      }
+      else
+      {
+        int Random = FMath::RandRange(1, 3);
+        CurrentAttack = static_cast<EAttack>(Random);
+      }
+    }
+  }
+
+  if (Anim)
+  {
+    Anim->SetIsSlashingLeft(   CurrentAttack == EAttack::Left);
+    Anim->SetIsSlashingRight(  CurrentAttack == EAttack::Right);
+    Anim->SetIsSlashingForward(CurrentAttack == EAttack::Forward);
+
+    // Specify the blend weight between sword attacks/basic movement
+    if (CurrentAttack != EAttack::NONE)
+    {
+      Anim->AddAttackMovementBlendWeight(0.1f);
+    }
+    else
+    {
+      Anim->SubtractAttackMovementBlendWeight(0.05f);
+    }
+  }
+}
+
+void AOutcastCharacter::SimulateConsecutiveDamage(const float DeltaTime)
+{
+  if (HasAuthority())
+  {
+    if (Health == 0)
+    {
+      Cast<AOutcastGameMode>(GetWorld()->GetAuthGameMode())->Respawn(MyPlayerController);
+    }
+  }
+
+  for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
+  {
+    AttackerIt->Value = AttackerIt->Value + DeltaTime;
+
+    if (AttackerIt->Value >= 1.0f)
+    {
+      AttackerIt->Value = 0.0f;
+
+      if (AttackerIt->Key->GetAttack() == EAttack::NONE)
+      {
+        Health = FMath::Clamp(Health - 1, 0, 100);
+        //PlayIdleHitSound();
+      }
+      else
+      {
+        Health = FMath::Clamp(Health - 20, 0, 100);
+        //PlayHitSound();
+      }
+      //PlayHitVocalSound();
+    }
+  }
 }
 
 FVector AOutcastCharacter::ReturnFVector(const FRotator& Rotator)
@@ -510,11 +654,12 @@ void AOutcastCharacter::BodyOverlapBegin(
   bool bFromSweep,
   const FHitResult& SweepResult)
 {
-  /*
   // Other Actor is the actor that triggered the event. Check that is not ourself.  
   if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
     AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+
+    UE_LOG(LogTemp, Warning, TEXT("OVERLAP!"));
 
     if (!DamageTakenBy.Contains(AttackingCharacter))
     {
@@ -523,16 +668,16 @@ void AOutcastCharacter::BodyOverlapBegin(
       if (AttackingCharacter->GetAttack() == EAttack::NONE)
       {
         Health = FMath::Clamp(Health - 1, 0, 100);
-        PlayIdleHitSound();
+        //PlayIdleHitSound();
       }
       else
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
-        PlayHitSound();
+        //PlayHitSound();
       }
-      PlayHitVocalSound();
+      //PlayHitVocalSound();
     }
-  }*/
+  }
 }
 
 void AOutcastCharacter::BodyOverlapEnd(
@@ -541,7 +686,6 @@ void AOutcastCharacter::BodyOverlapEnd(
   UPrimitiveComponent* OtherComp,
   int32 OtherBodyIndex)
 {
-  /*
   // Other Actor is the actor that triggered the event. Check that is not ourself.  
   if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
@@ -551,7 +695,7 @@ void AOutcastCharacter::BodyOverlapEnd(
     {
       DamageTakenBy.Remove(AttackingCharacter);
     }
-  }*/
+  }
 }
 
 void AOutcastCharacter::Jump()
@@ -613,95 +757,6 @@ void AOutcastCharacter::Jump()
   */
 }
 
-
-void AOutcastCharacter::DoAttack(const float DeltaTime)
-{
-  /*if (Attacking == EAttack::Left)
-  {
-    Attacking = Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE;
-  }
-  else if (Attacking == EAttack::Right)
-  {
-    Attacking = Anim->GetIsSlashingRight() ? EAttack::Right : EAttack::NONE;
-  }
-  else if (Attacking == EAttack::Forward)
-  {
-    Attacking = Anim->GetIsSlashingForward() ? EAttack::Forward : EAttack::NONE;
-  }
-
-  if (GetMousePressed(EMouse::Left))
-  {
-    if (Attacking == EAttack::NONE)
-    {
-      // Slashing left/right has priority over forward
-      if (GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D))
-      {
-        Attacking = EAttack::Left;
-      }
-      else if (!GetKeyPressed(EKey::A) && GetKeyPressed(EKey::D))
-      {
-        Attacking = EAttack::Right;
-      }
-      else if (!GetKeyPressed(EKey::A) && !GetKeyPressed(EKey::D) && GetKeyPressed(EKey::W))
-      {
-        Attacking = EAttack::Forward;
-      }
-      else
-      {
-        int Random = FMath::RandRange(1, 3);
-        Attacking = static_cast<EAttack>(Random);
-      }
-    }
-  }
-
-  Anim->SetIsSlashingLeft(Attacking == EAttack::Left);
-  Anim->SetIsSlashingRight(Attacking == EAttack::Right);
-  Anim->SetIsSlashingForward(Attacking == EAttack::Forward);
-
-  // Specify the blend weight for sword attacks/basic movement
-  if (Attacking != EAttack::NONE)
-  {
-    Anim->AddAttackMovementBlendWeight(0.1f);
-  }
-  else
-  {
-    Anim->SubtractAttackMovementBlendWeight(0.05f);
-  }*/
-}
-
-void AOutcastCharacter::TakeConsecutiveDamage(const float DeltaTime)
-{
-  /*if (HasAuthority())
-  {
-    if (Health == 0)
-    {
-      Cast<AOutcastGameMode>(GetWorld()->GetAuthGameMode())->Respawn(MyPlayerController);
-    }
-  }
-
-  for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
-  {
-    AttackerIt->Value = AttackerIt->Value + DeltaTime;
-
-    if (AttackerIt->Value >= 1.0f)
-    {
-      AttackerIt->Value = 0.0f;
-
-      if (AttackerIt->Key->GetAttack() == EAttack::NONE)
-      {
-        Health = FMath::Clamp(Health - 1, 0, 100);
-        PlayIdleHitSound();
-      }
-      else
-      {
-        Health = FMath::Clamp(Health - 20, 0, 100);
-        PlayHitSound();
-      }
-      PlayHitVocalSound();
-    }
-  }*/
-}
-
 void AOutcastCharacter::RegulateAcceleration()
 {
   if ( ForwardDirection != 0.0f
@@ -713,43 +768,6 @@ void AOutcastCharacter::RegulateAcceleration()
   {
     Acceleration = FMath::Clamp(Acceleration - AccelerationCoefficient, 0, 100);
   }
-}
-
-void AOutcastCharacter::SimulateLookAround(const FMove& Move)
-{
-  // Rotate whole Character
-  FRotator CharacterRotation = GetActorRotation();
-  CharacterRotation.Yaw      = CharacterRotation.Yaw + Move.MouseInput.X * Move.DeltaTime;
-  SetActorRotation(CharacterRotation);
-
-  if (Anim)
-  {
-    Anim->CalculateTorsoRotation(Move.MouseInput.Y * Move.DeltaTime);
-
-    if (IsLocallyControlled())
-    {
-      // Rotate the camera
-      FRotator NewCameraRot = CameraRotator->GetComponentRotation();
-      NewCameraRot.Pitch    = FMath::Clamp((Anim->GetTorsoRotation().Roll + Move.MouseInput.Y * Move.DeltaTime) * -1, -80.0f, 80.0f);
-
-      CameraRotator->SetWorldRotation(NewCameraRot);
-    }
-  }
-}
-
-void AOutcastCharacter::SimulateMovement(const FMove& Move)
-{
-  Capsule->AddWorldOffset(GetActorForwardVector() * Move.ForwardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
-  Capsule->AddWorldOffset(GetActorRightVector() * Move.SidewardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
-
-  if (Anim)
-  {
-    Anim->SetAccelerationAndLegRotation(Move.Acceleration, Move.ForwardDirection, Move.SidewardDirection);
-    Anim->SetWalkPlayrate(Move.ForwardDirection);
-  }
-
-  // Gravity
-  Capsule->AddWorldOffset(GetActorUpVector() * -1 * 990 * Move.DeltaTime, true);
 }
 
 void AOutcastCharacter::Tick(float DeltaTime)
@@ -786,7 +804,7 @@ void AOutcastCharacter::SetMyPlayerController(APlayerController* const NewPlayer
 
 EAttack AOutcastCharacter::GetAttack()
 {
-  return Attacking;
+  return CurrentAttack;
 }
 
 void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
