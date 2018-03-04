@@ -538,10 +538,6 @@ void AOutcastCharacter::BodyOverlapEnd(
   }*/
 }
 
-void AOutcastCharacter::Look()
-{
-}
-
 void AOutcastCharacter::Jump()
 {
   /*if (GetKeyPressed(EKey::Space))
@@ -604,7 +600,7 @@ void AOutcastCharacter::Jump()
 
 void AOutcastCharacter::DoAttack(const float DeltaTime)
 {
-  if (Attacking == EAttack::Left)
+  /*if (Attacking == EAttack::Left)
   {
     Attacking = Anim->GetIsSlashingLeft() ? EAttack::Left : EAttack::NONE;
   }
@@ -654,12 +650,12 @@ void AOutcastCharacter::DoAttack(const float DeltaTime)
   else
   {
     Anim->SubtractAttackMovementBlendWeight(0.05f);
-  }
+  }*/
 }
 
 void AOutcastCharacter::TakeConsecutiveDamage(const float DeltaTime)
 {
-  if (HasAuthority())
+  /*if (HasAuthority())
   {
     if (Health == 0)
     {
@@ -687,7 +683,7 @@ void AOutcastCharacter::TakeConsecutiveDamage(const float DeltaTime)
       }
       PlayHitVocalSound();
     }
-  }
+  }*/
 }
 
 void AOutcastCharacter::RegulateAcceleration()
@@ -791,60 +787,14 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
   // Keyboard input
-  /*PlayerInputComponent->BindAction(
-    "W",
-    IE_Pressed,
+  PlayerInputComponent->BindAxis(
+    "MoveForward",
     this,
-    &AOutcastCharacter::WPressed);
-  PlayerInputComponent->BindAction(
-    "W",
-    IE_Released,
+    &AOutcastCharacter::MoveForward);
+  PlayerInputComponent->BindAxis(
+    "MoveRight",
     this,
-    &AOutcastCharacter::WReleased);
-
-  PlayerInputComponent->BindAction(
-    "A",
-    IE_Pressed,
-    this,
-    &AOutcastCharacter::APressed);
-  PlayerInputComponent->BindAction(
-    "A",
-    IE_Released,
-    this,
-    &AOutcastCharacter::AReleased);
-
-  PlayerInputComponent->BindAction(
-    "S",
-    IE_Pressed,
-    this,
-    &AOutcastCharacter::SPressed);
-  PlayerInputComponent->BindAction(
-    "S",
-    IE_Released,
-    this,
-    &AOutcastCharacter::SReleased);
-
-  PlayerInputComponent->BindAction(
-    "D",
-    IE_Pressed,
-    this,
-    &AOutcastCharacter::DPressed);
-  PlayerInputComponent->BindAction(
-    "D",
-    IE_Released,
-    this,
-    &AOutcastCharacter::DReleased);
-
-  PlayerInputComponent->BindAction(
-    "Space",
-    IE_Pressed,
-    this,
-    &AOutcastCharacter::SpacePressed);
-  PlayerInputComponent->BindAction(
-    "Space",
-    IE_Released,
-    this,
-    &AOutcastCharacter::SpaceReleased);*/
+    &AOutcastCharacter::MoveRight);
 
   // Mouse input
   PlayerInputComponent->BindAction(
@@ -877,25 +827,6 @@ void AOutcastCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
     "MouseRightLeft",
     this,
     &AOutcastCharacter::MouseRightLeft);
-
-  PlayerInputComponent->BindAxis(
-    "MoveForward",
-    this,
-    &AOutcastCharacter::MoveForward);
-  PlayerInputComponent->BindAxis(
-    "MoveRight",
-    this,
-    &AOutcastCharacter::MoveRight);
-}
-
-bool AOutcastCharacter::GetKeyPressed(const EKey Key)
-{
-  return KeyMap[static_cast<int>(Key)];
-}
-
-void AOutcastCharacter::SetKeyPressed(const EKey Key, const bool bValue)
-{
-  KeyMap[static_cast<int>(Key)] = bValue;
 }
 
 void AOutcastCharacter::MoveForward(const float AxisValue)
@@ -906,56 +837,6 @@ void AOutcastCharacter::MoveForward(const float AxisValue)
 void AOutcastCharacter::MoveRight(const float AxisValue)
 {
   SidewardDirection = AxisValue;
-}
-
-void AOutcastCharacter::WPressed()
-{
-  SetKeyPressed(EKey::W, true);
-}
-
-void AOutcastCharacter::WReleased()
-{
-  SetKeyPressed(EKey::W, false);
-}
-
-void AOutcastCharacter::APressed()
-{
-  SetKeyPressed(EKey::A, true);
-}
-
-void AOutcastCharacter::AReleased()
-{
-  SetKeyPressed(EKey::A, false);
-}
-
-void AOutcastCharacter::SPressed()
-{
-  SetKeyPressed(EKey::S, true);
-}
-
-void AOutcastCharacter::SReleased()
-{
-  SetKeyPressed(EKey::S, false);
-}
-
-void AOutcastCharacter::DPressed()
-{
-  SetKeyPressed(EKey::D, true);
-}
-
-void AOutcastCharacter::DReleased()
-{
-  SetKeyPressed(EKey::D, false);
-}
-
-void AOutcastCharacter::SpacePressed()
-{
-  SetKeyPressed(EKey::Space, true);
-}
-
-void AOutcastCharacter::SpaceReleased()
-{
-  SetKeyPressed(EKey::Space, false);
 }
 
 bool AOutcastCharacter::GetMousePressed(const EMouse MouseKey)

@@ -254,22 +254,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** PLAYER INPUT ********
   TArray<bool> KeyMap;
-  bool GetKeyPressed(const EKey Key);
-  void SetKeyPressed(const EKey Key, const bool bValue);
-  void WPressed();
-  void WReleased();
-
-  void APressed();
-  void AReleased();
-
-  void SPressed();
-  void SReleased();
-
-  void DPressed();
-  void DReleased();
-
-  void SpacePressed();
-  void SpaceReleased();
 
   FVector2D MouseInput;
   TArray<bool> MouseMap;
@@ -294,7 +278,6 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   //******** COLLISION ********
 
   //******** TICK FUNCTIONS ********
-  void Look();
   void Jump();
   void DoAttack(const float DeltaTime);
   void TakeConsecutiveDamage(const float DeltaTime);
