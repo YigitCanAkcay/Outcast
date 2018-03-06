@@ -6,8 +6,14 @@
 
 AOutcastCharacter::AOutcastCharacter()
   :
+  DefaultMeshLocationOffset(FVector(0.0f, 0.0f, -120.0f)),
+  DefaultMeshRotationOffset(FRotator(0.0f, -90.0f, 0.0f)),
   ServerState(),
   bReconcilingWithServer(false),
+  MaxInterpolationDistance(1000.0f),
+  MeshTranslationOffset(FVector::ZeroVector),
+  MaxInterpolationDeltaRotation(360.0f),
+  MeshRotationOffset(FRotator::ZeroRotator),
   ForwardDirection(0.0f),
   SidewardDirection(0.0f),
   Acceleration(0.0f),
@@ -24,9 +30,8 @@ AOutcastCharacter::AOutcastCharacter()
 {
  	PrimaryActorTick.bCanEverTick = true;
 
-  // Initialize Mouse Input
   // Since TMaps can't be replicated a TArray will be used instead
-  // pre initialized with 5 elements so that EKey can be used to index
+  // pre initialized with 2 elements so that EMouse can be used to index
   MouseMap.Add(false);
   MouseMap.Add(false);
 
@@ -42,8 +47,8 @@ AOutcastCharacter::AOutcastCharacter()
       Body->SetAnimInstanceClass(AnimBP.Object);
     }
 
-    Body->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
-    Body->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+    Body->SetRelativeLocation(DefaultMeshLocationOffset);
+    Body->SetRelativeRotation(DefaultMeshRotationOffset);
   }
 
    ConstructorHelpers::FObjectFinder<UStaticMesh> WeaponMesh(TEXT("StaticMesh'/Game/Meshes/Weapon_StaticMesh.Weapon_StaticMesh'"));
@@ -88,11 +93,13 @@ AOutcastCharacter::AOutcastCharacter()
   Camera->SetRelativeLocation(FVector(-423.0f, 0.0f, 200.0f));
   Camera->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
 
+  // UNUSED
   Movement               = Cast<UCharacterMovementComponent>(GetMovementComponent());
   Movement->AirControl   = 1.0f;
   Movement->MaxWalkSpeed = 1000.0f;
   Movement->MaxFlySpeed  = 10000.0f;
   Movement->GravityScale = 5.0f;
+  // UNUSED
 
   bUseControllerRotationYaw   = false;
   bUseControllerRotationPitch = false;
@@ -310,6 +317,7 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
     Anim->SetAccelerationAndLegRotation(State.Move.Acceleration, State.Move.ForwardDirection, State.Move.SidewardDirection);
     Anim->SetTorsoRotation(ReturnFRotator(State.TorsoRotation));
 
+    // Uncommenting this interrupts client side attack animation when lagging
     /*Anim->SetIsSlashingLeft(   State.CurrentAttack == EAttack::Left);
     Anim->SetIsSlashingRight(  State.CurrentAttack == EAttack::Right);
     Anim->SetIsSlashingForward(State.CurrentAttack == EAttack::Forward);*/
@@ -322,14 +330,35 @@ void AOutcastCharacter::OnRep_ServerState()
   if (IsLocallyControlled())
   {
     ResetToServerState(ServerState);
-  
     CleanUnacknowledgedMoves();
     ReconcileWithServer();
   }
   else if (Role == ROLE_SimulatedProxy)
   {
+    FVector NewToOldLocation = GetActorLocation() - ServerState.Location;
+    float Distance = NewToOldLocation.Size();
+    if (Distance > MaxInterpolationDistance)
+    {
+      MeshTranslationOffset = FVector::ZeroVector;
+    }
+    else
+    {
+      MeshTranslationOffset = MeshTranslationOffset + NewToOldLocation;
+    }
+
+    FVector NewToOldRotation = ReturnFVector(GetActorRotation() - ReturnFRotator(ServerState.Rotation));
+    float DeltaRot = NewToOldRotation.Size();
+    if (DeltaRot > MaxInterpolationDeltaRotation)
+    {
+      MeshRotationOffset = FRotator::ZeroRotator;
+    }
+    else
+    {
+      MeshRotationOffset = MeshRotationOffset + ReturnFRotator(NewToOldRotation);
+    }
+
     ResetToServerState(ServerState);
-    Simulate(ServerState.Move);
+    SimulateAttacks(ServerState.Move);
   }
   bReconcilingWithServer = false;
 }
@@ -374,7 +403,7 @@ void AOutcastCharacter::Server_SendMove_Implementation(const FMove Move)
 
   ServerState = CreateState(Move);
 
-  Multicast_SendMove(Move);
+  //Multicast_SendMove(Move);
 }
 
 bool AOutcastCharacter::Server_SendMove_Validate(const FMove Move)
@@ -783,6 +812,18 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
       //UE_LOG(LogTemp, Warning, TEXT("%d"), UnacknowledgedMoves.Num());
     }
+  }
+  else
+  {
+    MeshTranslationOffset = MeshTranslationOffset * (1.0f - DeltaTime / 0.125);
+    FVector NewRelativeTranslation = UKismetMathLibrary::InverseTransformDirection(GetActorTransform(), MeshTranslationOffset) + DefaultMeshLocationOffset;
+    
+    Body->SetRelativeLocation(NewRelativeTranslation);
+
+    MeshRotationOffset = MeshRotationOffset * (1.0f - DeltaTime / 0.125);
+    FRotator NewRelativeRotation = MeshRotationOffset + DefaultMeshRotationOffset;
+
+    Body->SetRelativeRotation(NewRelativeRotation);
   }
 }
 

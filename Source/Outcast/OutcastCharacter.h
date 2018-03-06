@@ -16,6 +16,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Kismet/GameplayStatics.h"
 #include "Runtime/Core/Public/Misc/DateTime.h"
+#include "Runtime/Engine/Classes/Kismet/KismetMathLibrary.h"
 
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
@@ -37,9 +38,9 @@ UENUM()
 enum class EAttack
 {
   NONE    = 0,
-  Left    = 2,
-  Right   = 3,
-  Forward = 4
+  Left    = 1,
+  Right   = 2,
+  Forward = 3
 };
 
 UENUM()
@@ -71,8 +72,14 @@ struct FMove
     ForwardDirection(0.0f), 
     SidewardDirection(0.0f),
     Acceleration(0.0f),
-    MouseInput(FVector2D::ZeroVector)
-  {}
+    MouseInput(FVector2D::ZeroVector),
+    MouseMap()
+  {
+    // Since TMaps can't be replicated a TArray will be used instead
+    // pre initialized with 2 elements so that EMouse can be used to index
+    MouseMap.Add(false);
+    MouseMap.Add(false);
+  }
 
   UPROPERTY()
   float DeltaTime;
@@ -144,6 +151,9 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   UBoxComponent* CameraRotator;
 
   UCharacterMovementComponent* Movement;
+
+  FVector DefaultMeshLocationOffset;
+  FRotator DefaultMeshRotationOffset;
   //******** COMPONENTS ********
 
   //******** ASSETS ********
@@ -201,6 +211,14 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   bool bReconcilingWithServer;
   //******** REPLICATION ********
+
+  //******** INTERPOLATION ********
+  float MaxInterpolationDistance;
+  FVector MeshTranslationOffset;
+
+  float MaxInterpolationDeltaRotation;
+  FRotator MeshRotationOffset;
+  //******** INTERPOLATION ********
 
   //******** SIMULATION ********
   void SimulateLookAround(const FMove& Move);

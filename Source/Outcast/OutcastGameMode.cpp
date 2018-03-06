@@ -37,6 +37,9 @@ void AOutcastGameMode::Respawn(APlayerController* Player)
   AOutcastCharacter* NewCharacter = GetWorld()->SpawnActor<AOutcastCharacter>(AOutcastCharacter::StaticClass(), 
     PlayerStart->GetActorLocation(), PlayerStart->GetActorRotation());
 
-  Player->Possess(NewCharacter);
-  NewCharacter->SetMyPlayerController(Player);
+  if (NewCharacter)
+  {
+    Player->Possess(NewCharacter);
+    NewCharacter->SetMyPlayerController(Player);
+  }
 }
