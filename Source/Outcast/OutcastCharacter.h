@@ -210,6 +210,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
   void Simulate(const FMove& Move);
 
   bool bReconcilingWithServer;
+
+  FVector SimulatedProxyLastLocation;
   //******** REPLICATION ********
 
   //******** INTERPOLATION ********
@@ -218,6 +220,8 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   float MaxInterpolationDeltaRotation;
   FRotator MeshRotationOffset;
+
+  void InterpolateSimulatedProxy(const FState& State);
   //******** INTERPOLATION ********
 
   //******** SIMULATION ********

@@ -10,9 +10,10 @@ AOutcastCharacter::AOutcastCharacter()
   DefaultMeshRotationOffset(FRotator(0.0f, -90.0f, 0.0f)),
   ServerState(),
   bReconcilingWithServer(false),
+  SimulatedProxyLastLocation(FVector::ZeroVector),
   MaxInterpolationDistance(1000.0f),
   MeshTranslationOffset(FVector::ZeroVector),
-  MaxInterpolationDeltaRotation(360.0f),
+  MaxInterpolationDeltaRotation(100.0f),
   MeshRotationOffset(FRotator::ZeroRotator),
   ForwardDirection(0.0f),
   SidewardDirection(0.0f),
@@ -315,6 +316,7 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
   if (Anim)
   {
     Anim->SetAccelerationAndLegRotation(State.Move.Acceleration, State.Move.ForwardDirection, State.Move.SidewardDirection);
+    Anim->SetWalkPlayrate(State.Move.ForwardDirection);
     Anim->SetTorsoRotation(ReturnFRotator(State.TorsoRotation));
 
     // Uncommenting this interrupts client side attack animation when lagging
@@ -346,7 +348,7 @@ void AOutcastCharacter::OnRep_ServerState()
       MeshTranslationOffset = MeshTranslationOffset + NewToOldLocation;
     }
 
-    FVector NewToOldRotation = ReturnFVector(GetActorRotation() - ReturnFRotator(ServerState.Rotation));
+    FVector NewToOldRotation = ReturnFVector( (GetActorRotation() - ReturnFRotator(ServerState.Rotation)).GetNormalized() );
     float DeltaRot = NewToOldRotation.Size();
     if (DeltaRot > MaxInterpolationDeltaRotation)
     {
@@ -357,6 +359,7 @@ void AOutcastCharacter::OnRep_ServerState()
       MeshRotationOffset = MeshRotationOffset + ReturnFRotator(NewToOldRotation);
     }
 
+    SimulatedProxyLastLocation = GetActorLocation();
     ResetToServerState(ServerState);
     SimulateAttacks(ServerState.Move);
   }
@@ -445,6 +448,7 @@ void AOutcastCharacter::ReconcileWithServer()
   {
     SimulateMovement(Move);
     SimulateLookAround(Move);
+    SimulateConsecutiveDamage(Move.DeltaTime);
   }
 }
 
@@ -454,6 +458,28 @@ void AOutcastCharacter::Simulate(const FMove& Move)
   SimulateMovement(Move); 
   SimulateAttacks(Move);
   SimulateConsecutiveDamage(Move.DeltaTime);
+}
+
+void AOutcastCharacter::InterpolateSimulatedProxy(const FState& State)
+{
+  MeshTranslationOffset = MeshTranslationOffset * (1.0f - State.Move.DeltaTime / 0.125);
+  FVector NewRelativeTranslation = UKismetMathLibrary::InverseTransformDirection(GetActorTransform(), MeshTranslationOffset) + DefaultMeshLocationOffset;
+
+  Body->SetRelativeLocation(NewRelativeTranslation);
+
+  if (MeshRotationOffset.Yaw > 360)
+  {
+    MeshRotationOffset.Yaw = MeshRotationOffset.Yaw - 360;
+  }
+  else if (MeshRotationOffset.Yaw < -360)
+  {
+    MeshRotationOffset.Yaw = MeshRotationOffset.Yaw + 360;
+  }
+
+  MeshRotationOffset = MeshRotationOffset * (1.0f - State.Move.DeltaTime / 0.125);
+  FRotator NewRelativeRotation = MeshRotationOffset + DefaultMeshRotationOffset;
+
+  Body->SetRelativeRotation(NewRelativeRotation);
 }
 
 void AOutcastCharacter::SimulateLookAround(const FMove& Move)
@@ -675,10 +701,17 @@ void AOutcastCharacter::BodyOverlapBegin(
   int32 OtherBodyIndex,
   bool bFromSweep,
   const FHitResult& SweepResult)
-{ 
+{
   if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
   {
     AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+
+    if (Role == ROLE_SimulatedProxy 
+      && (GetActorLocation() - SimulatedProxyLastLocation).Size() < 100.0f
+      && DamageTakenBy.Contains(AttackingCharacter))
+    {
+      return;
+    }
 
     if (!DamageTakenBy.Contains(AttackingCharacter))
     {
@@ -687,12 +720,12 @@ void AOutcastCharacter::BodyOverlapBegin(
       if (AttackingCharacter->GetAttack() == EAttack::NONE)
       {
         Health = FMath::Clamp(Health - 1, 0, 100);
-        //PlayIdleHitSound();
+        PlayIdleHitSound();
       }
       else
       {
         Health = FMath::Clamp(Health - 20, 0, 100);
-        //PlayHitSound();
+        PlayHitSound();
       }
       PlayHitVocalSound();
     }
@@ -708,6 +741,13 @@ void AOutcastCharacter::BodyOverlapEnd(
   if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
   {
     AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+
+    if (Role == ROLE_SimulatedProxy
+      && (GetActorLocation() - SimulatedProxyLastLocation).Size() < 100.0f
+      && !bReconcilingWithServer)
+    {
+      return;
+    }
 
     if (DamageTakenBy.Contains(AttackingCharacter))
     {
@@ -794,8 +834,6 @@ void AOutcastCharacter::Tick(float DeltaTime)
 
   if (IsLocallyControlled())
   {
-    // Regulate it before (or after) creating the move and simulating
-    // it, but not in between.
     RegulateAcceleration();
 
     FMove Move = CreateMove(DeltaTime);
@@ -809,21 +847,11 @@ void AOutcastCharacter::Tick(float DeltaTime)
     else
     {
       Server_SendMove(Move);
-
-      //UE_LOG(LogTemp, Warning, TEXT("%d"), UnacknowledgedMoves.Num());
     }
   }
   else
   {
-    MeshTranslationOffset = MeshTranslationOffset * (1.0f - DeltaTime / 0.125);
-    FVector NewRelativeTranslation = UKismetMathLibrary::InverseTransformDirection(GetActorTransform(), MeshTranslationOffset) + DefaultMeshLocationOffset;
-    
-    Body->SetRelativeLocation(NewRelativeTranslation);
-
-    MeshRotationOffset = MeshRotationOffset * (1.0f - DeltaTime / 0.125);
-    FRotator NewRelativeRotation = MeshRotationOffset + DefaultMeshRotationOffset;
-
-    Body->SetRelativeRotation(NewRelativeRotation);
+    InterpolateSimulatedProxy(ServerState);
   }
 }
 
