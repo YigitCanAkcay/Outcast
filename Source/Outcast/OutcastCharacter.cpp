@@ -10,7 +10,6 @@ AOutcastCharacter::AOutcastCharacter()
   DefaultMeshRotationOffset(FRotator(0.0f, -90.0f, 0.0f)),
   ServerState(),
   bReconcilingWithServer(false),
-  SimulatedProxyLastLocation(FVector::ZeroVector),
   MaxInterpolationDistance(1000.0f),
   MeshTranslationOffset(FVector::ZeroVector),
   MaxInterpolationDeltaRotation(100.0f),
@@ -311,6 +310,17 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
 {
   SetActorLocation(State.Location);
   SetActorRotation(ReturnFRotator(State.Rotation));
+
+  if (Health - State.Health == 1)
+  {
+    PlayIdleHitSound();
+    PlayHitVocalSound();
+  }
+  else if (Health - State.Health == 20)
+  {
+    PlayHitSound();
+    PlayHitVocalSound();
+  }
   Health = State.Health;
 
   if (Anim)
@@ -337,29 +347,8 @@ void AOutcastCharacter::OnRep_ServerState()
   }
   else if (Role == ROLE_SimulatedProxy)
   {
-    FVector NewToOldLocation = GetActorLocation() - ServerState.Location;
-    float Distance = NewToOldLocation.Size();
-    if (Distance > MaxInterpolationDistance)
-    {
-      MeshTranslationOffset = FVector::ZeroVector;
-    }
-    else
-    {
-      MeshTranslationOffset = MeshTranslationOffset + NewToOldLocation;
-    }
+    CalculateSimulatedProxyInterpolation();
 
-    FVector NewToOldRotation = ReturnFVector( (GetActorRotation() - ReturnFRotator(ServerState.Rotation)).GetNormalized() );
-    float DeltaRot = NewToOldRotation.Size();
-    if (DeltaRot > MaxInterpolationDeltaRotation)
-    {
-      MeshRotationOffset = FRotator::ZeroRotator;
-    }
-    else
-    {
-      MeshRotationOffset = MeshRotationOffset + ReturnFRotator(NewToOldRotation);
-    }
-
-    SimulatedProxyLastLocation = GetActorLocation();
     ResetToServerState(ServerState);
     SimulateAttacks(ServerState.Move);
   }
@@ -371,7 +360,7 @@ FState AOutcastCharacter::CreateState(const FMove& Move)
   FState NewState;
 
   NewState.Location      = GetActorLocation();
-  NewState.Rotation      = ReturnFVector(GetActorRotation());
+  NewState.Rotation      = ReturnFVector(GetActorRotation().GetNormalized());
   NewState.TorsoRotation = ReturnFVector(Anim->GetTorsoRotation());
   NewState.CurrentAttack = CurrentAttack;
   NewState.Health        = Health;
@@ -405,24 +394,9 @@ void AOutcastCharacter::Server_SendMove_Implementation(const FMove Move)
   Simulate(Move);
 
   ServerState = CreateState(Move);
-
-  //Multicast_SendMove(Move);
 }
 
 bool AOutcastCharacter::Server_SendMove_Validate(const FMove Move)
-{
-  return true;
-}
-
-void AOutcastCharacter::Multicast_SendMove_Implementation(const FMove Move)
-{
-  if (Role == ROLE_SimulatedProxy)
-  {
-    Simulate(Move);
-  }
-}
-
-bool AOutcastCharacter::Multicast_SendMove_Validate(const FMove Move)
 {
   return true;
 }
@@ -460,6 +434,31 @@ void AOutcastCharacter::Simulate(const FMove& Move)
   SimulateConsecutiveDamage(Move.DeltaTime);
 }
 
+void AOutcastCharacter::CalculateSimulatedProxyInterpolation()
+{
+  FVector NewToOldLocation = GetActorLocation() - ServerState.Location;
+  float Distance = NewToOldLocation.Size();
+  if (Distance > MaxInterpolationDistance)
+  {
+    MeshTranslationOffset = FVector::ZeroVector;
+  }
+  else
+  {
+    MeshTranslationOffset = MeshTranslationOffset + NewToOldLocation;
+  }
+
+  FVector NewToOldRotation = ReturnFVector((GetActorRotation() - ReturnFRotator(ServerState.Rotation)).GetNormalized());
+  float DeltaRot = NewToOldRotation.Size();
+  if (DeltaRot > MaxInterpolationDeltaRotation)
+  {
+    MeshRotationOffset = FRotator::ZeroRotator;
+  }
+  else
+  {
+    MeshRotationOffset = MeshRotationOffset + ReturnFRotator(NewToOldRotation);
+  }
+}
+
 void AOutcastCharacter::InterpolateSimulatedProxy(const FState& State)
 {
   MeshTranslationOffset = MeshTranslationOffset * (1.0f - State.Move.DeltaTime / 0.125);
@@ -487,7 +486,7 @@ void AOutcastCharacter::SimulateLookAround(const FMove& Move)
   // Rotate whole Character
   FRotator CharacterRotation = GetActorRotation();
   CharacterRotation.Yaw      = CharacterRotation.Yaw + Move.MouseInput.X * Move.DeltaTime;
-  SetActorRotation(CharacterRotation);
+  SetActorRotation(CharacterRotation.GetNormalized());
 
   if (Anim)
   {
@@ -506,8 +505,8 @@ void AOutcastCharacter::SimulateLookAround(const FMove& Move)
 
 void AOutcastCharacter::SimulateMovement(const FMove& Move)
 {
-  Capsule->AddWorldOffset(GetActorForwardVector() * Move.ForwardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
-  Capsule->AddWorldOffset(GetActorRightVector() * Move.SidewardDirection * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
+  FVector Direction = (GetActorForwardVector() * Move.ForwardDirection) + (GetActorRightVector() * Move.SidewardDirection);
+  Capsule->AddWorldOffset(Direction * Move.Acceleration * MaxWalkSpeed * Move.DeltaTime, true);
 
   if (Anim)
   {
@@ -581,31 +580,31 @@ void AOutcastCharacter::SimulateConsecutiveDamage(const float DeltaTime)
 {
   if (HasAuthority())
   {
+    for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
+    {
+      AttackerIt->Value = AttackerIt->Value + DeltaTime;
+
+      if (AttackerIt->Value >= 1.0f && !bReconcilingWithServer)
+      {
+        AttackerIt->Value = 0.0f;
+
+        if (AttackerIt->Key->GetAttack() == EAttack::NONE)
+        {
+          Health = FMath::Clamp(Health - 1, 0, 100);
+          PlayIdleHitSound();
+        }
+        else
+        {
+          Health = FMath::Clamp(Health - 20, 0, 100);
+          PlayHitSound();
+        }
+        PlayHitVocalSound();
+      }
+    }
+
     if (Health == 0)
     {
       Cast<AOutcastGameMode>(GetWorld()->GetAuthGameMode())->Respawn(MyPlayerController);
-    }
-  }
-
-  for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
-  {
-    AttackerIt->Value = AttackerIt->Value + DeltaTime;
-
-    if (AttackerIt->Value >= 1.0f && !bReconcilingWithServer)
-    {
-      AttackerIt->Value = 0.0f;
-
-      if (AttackerIt->Key->GetAttack() == EAttack::NONE)
-      {
-        Health = FMath::Clamp(Health - 1, 0, 100);
-        PlayIdleHitSound();
-      }
-      else
-      {
-        Health = FMath::Clamp(Health - 20, 0, 100);
-        PlayHitSound();
-      }
-      PlayHitVocalSound();
     }
   }
 }
@@ -702,32 +701,28 @@ void AOutcastCharacter::BodyOverlapBegin(
   bool bFromSweep,
   const FHitResult& SweepResult)
 {
-  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
+  if (HasAuthority())
   {
-    AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
-
-    if (Role == ROLE_SimulatedProxy 
-      && (GetActorLocation() - SimulatedProxyLastLocation).Size() < 100.0f
-      && DamageTakenBy.Contains(AttackingCharacter))
+    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
     {
-      return;
-    }
+      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
 
-    if (!DamageTakenBy.Contains(AttackingCharacter))
-    {
-      DamageTakenBy.Add(AttackingCharacter, 0.0f);
+      if (!DamageTakenBy.Contains(AttackingCharacter))
+      {
+        DamageTakenBy.Add(AttackingCharacter, 0.0f);
 
-      if (AttackingCharacter->GetAttack() == EAttack::NONE)
-      {
-        Health = FMath::Clamp(Health - 1, 0, 100);
-        PlayIdleHitSound();
+        if (AttackingCharacter->GetAttack() == EAttack::NONE)
+        {
+          Health = FMath::Clamp(Health - 1, 0, 100);
+          PlayIdleHitSound();
+        }
+        else
+        {
+          Health = FMath::Clamp(Health - 20, 0, 100);
+          PlayHitSound();
+        }
+        PlayHitVocalSound();
       }
-      else
-      {
-        Health = FMath::Clamp(Health - 20, 0, 100);
-        PlayHitSound();
-      }
-      PlayHitVocalSound();
     }
   }
 }
@@ -738,20 +733,16 @@ void AOutcastCharacter::BodyOverlapEnd(
   UPrimitiveComponent* OtherComp,
   int32 OtherBodyIndex)
 {
-  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
+  if (HasAuthority())
   {
-    AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
-
-    if (Role == ROLE_SimulatedProxy
-      && (GetActorLocation() - SimulatedProxyLastLocation).Size() < 100.0f
-      && !bReconcilingWithServer)
+    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
     {
-      return;
-    }
+      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
 
-    if (DamageTakenBy.Contains(AttackingCharacter))
-    {
-      DamageTakenBy.Remove(AttackingCharacter);
+      if (DamageTakenBy.Contains(AttackingCharacter))
+      {
+        DamageTakenBy.Remove(AttackingCharacter);
+      }
     }
   }
 }
