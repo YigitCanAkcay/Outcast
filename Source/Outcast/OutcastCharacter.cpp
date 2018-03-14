@@ -311,7 +311,7 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
   SetActorLocation(State.Location);
   SetActorRotation(ReturnFRotator(State.Rotation));
 
-  if (Health - State.Health == 1)
+  /*if (Health - State.Health == 1)
   {
     PlayIdleHitSound();
     PlayHitVocalSound();
@@ -320,7 +320,7 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
   {
     PlayHitSound();
     PlayHitVocalSound();
-  }
+  }*/
   Health = State.Health;
 
   if (Anim)
@@ -338,12 +338,13 @@ void AOutcastCharacter::ResetToServerState(const FState& State)
 
 void AOutcastCharacter::OnRep_ServerState()
 {
-  bReconcilingWithServer = true;
   if (IsLocallyControlled())
   {
+    bReconcilingWithServer = true;
     ResetToServerState(ServerState);
     CleanUnacknowledgedMoves();
     ReconcileWithServer();
+    bReconcilingWithServer = false;
   }
   else if (Role == ROLE_SimulatedProxy)
   {
@@ -351,8 +352,8 @@ void AOutcastCharacter::OnRep_ServerState()
 
     ResetToServerState(ServerState);
     SimulateAttacks(ServerState.Move);
+    SimulateConsecutiveDamage(ServerState.Move.DeltaTime);
   }
-  bReconcilingWithServer = false;
 }
 
 FState AOutcastCharacter::CreateState(const FMove& Move)
@@ -578,30 +579,49 @@ void AOutcastCharacter::SimulateAttacks(const FMove& Move)
 
 void AOutcastCharacter::SimulateConsecutiveDamage(const float DeltaTime)
 {
-  if (HasAuthority())
+  if (!bReconcilingWithServer)
   {
+    TArray<AOutcastCharacter*> ToRemove;
     for (auto AttackerIt = DamageTakenBy.CreateIterator(); AttackerIt; ++AttackerIt)
     {
-      AttackerIt->Value = AttackerIt->Value + DeltaTime;
+      AttackerIt->Value.Timer = AttackerIt->Value.Timer + DeltaTime;
 
-      if (AttackerIt->Value >= 1.0f && !bReconcilingWithServer)
+      if (AttackerIt->Value.Timer >= 0.5 && AttackerIt->Value.Timer < 1.0f && AttackerIt->Value.bRequestRemoval)
       {
-        AttackerIt->Value = 0.0f;
+        ToRemove.Add(AttackerIt->Key);
+      }
+      else if (AttackerIt->Value.Timer >= 1.0f)
+      {
+        AttackerIt->Value.Timer = 0.0f;
 
         if (AttackerIt->Key->GetAttack() == EAttack::NONE)
         {
-          Health = FMath::Clamp(Health - 1, 0, 100);
+          if (HasAuthority())
+          {
+            Health = FMath::Clamp(Health - 1, 0, 100);
+          }
           PlayIdleHitSound();
         }
         else
         {
-          Health = FMath::Clamp(Health - 20, 0, 100);
+          if (HasAuthority())
+          {
+            Health = FMath::Clamp(Health - 20, 0, 100);
+          }
           PlayHitSound();
         }
         PlayHitVocalSound();
       }
     }
 
+    for (AOutcastCharacter* CharacterToRemove : ToRemove)
+    {
+      DamageTakenBy.Remove(CharacterToRemove);
+    }
+  }
+
+  if (HasAuthority())
+  {
     if (Health == 0)
     {
       Cast<AOutcastGameMode>(GetWorld()->GetAuthGameMode())->Respawn(MyPlayerController);
@@ -701,28 +721,38 @@ void AOutcastCharacter::BodyOverlapBegin(
   bool bFromSweep,
   const FHitResult& SweepResult)
 {
-  if (HasAuthority())
+  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
-    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
+    AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+
+    if (!DamageTakenBy.Contains(AttackingCharacter))
     {
-      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+      FDamageTimer DamageTimer;
+      DamageTimer.Timer           = 0.0f;
+      DamageTimer.bRequestRemoval = false;
+      DamageTakenBy.Add(AttackingCharacter, DamageTimer);
 
-      if (!DamageTakenBy.Contains(AttackingCharacter))
+      if (AttackingCharacter->GetAttack() == EAttack::NONE)
       {
-        DamageTakenBy.Add(AttackingCharacter, 0.0f);
-
-        if (AttackingCharacter->GetAttack() == EAttack::NONE)
+        if (HasAuthority())
         {
           Health = FMath::Clamp(Health - 1, 0, 100);
-          PlayIdleHitSound();
         }
-        else
+        PlayIdleHitSound();
+      }
+      else
+      {
+        if (HasAuthority())
         {
           Health = FMath::Clamp(Health - 20, 0, 100);
-          PlayHitSound();
         }
-        PlayHitVocalSound();
+        PlayHitSound();
       }
+      PlayHitVocalSound();
+    }
+    else
+    {
+      DamageTakenBy[AttackingCharacter].bRequestRemoval = false;
     }
   }
 }
@@ -733,16 +763,13 @@ void AOutcastCharacter::BodyOverlapEnd(
   UPrimitiveComponent* OtherComp,
   int32 OtherBodyIndex)
 {
-  if (HasAuthority())
+  if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr))
   {
-    if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && !bReconcilingWithServer)
-    {
-      AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
+    AOutcastCharacter* AttackingCharacter = Cast<AOutcastCharacter>(OtherActor);
 
-      if (DamageTakenBy.Contains(AttackingCharacter))
-      {
-        DamageTakenBy.Remove(AttackingCharacter);
-      }
+    if (DamageTakenBy.Contains(AttackingCharacter))
+    {
+      DamageTakenBy[AttackingCharacter].bRequestRemoval = true;
     }
   }
 }

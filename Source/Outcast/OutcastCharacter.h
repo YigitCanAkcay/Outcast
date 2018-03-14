@@ -256,9 +256,14 @@ class OUTCAST_API AOutcastCharacter : public ACharacter
 
   //******** ATTACKING ********
   UFUNCTION(BlueprintCallable)
-    int GetHealth();
+  int GetHealth();
 
-  TMap<AOutcastCharacter*, float> DamageTakenBy;
+  struct FDamageTimer
+  {
+    float Timer;
+    bool bRequestRemoval;
+  };
+  TMap<AOutcastCharacter*, FDamageTimer> DamageTakenBy;
 
   EAttack CurrentAttack;
   int Health;
